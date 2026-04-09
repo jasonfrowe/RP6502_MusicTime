@@ -36,6 +36,54 @@ static void copy_entry_name(char *dst, const char *src) {
     safe_copy(dst, src, MAX_ENTRY_NAME_LEN + 1);
 }
 
+static int compare_entry_names(const char *lhs, const char *rhs) {
+    while (*lhs != '\0' && *rhs != '\0') {
+        int lch = tolower((unsigned char)*lhs);
+        int rch = tolower((unsigned char)*rhs);
+
+        if (lch != rch) {
+            return lch - rch;
+        }
+
+        ++lhs;
+        ++rhs;
+    }
+
+    return tolower((unsigned char)*lhs) - tolower((unsigned char)*rhs);
+}
+
+static int compare_entries(const browser_entry_t *lhs, const browser_entry_t *rhs) {
+    if (strcmp(lhs->name, "..") == 0) {
+        return -1;
+    }
+    if (strcmp(rhs->name, "..") == 0) {
+        return 1;
+    }
+
+    if (lhs->is_dir != rhs->is_dir) {
+        return lhs->is_dir ? -1 : 1;
+    }
+
+    return compare_entry_names(lhs->name, rhs->name);
+}
+
+static void sort_entries(browser_state_t *state) {
+    uint16_t i;
+    uint16_t j;
+
+    for (i = 1; i < state->entry_count; ++i) {
+        browser_entry_t key = state->entries[i];
+        j = i;
+
+        while (j > 0 && compare_entries(&key, &state->entries[j - 1]) < 0) {
+            state->entries[j] = state->entries[j - 1];
+            --j;
+        }
+
+        state->entries[j] = key;
+    }
+}
+
 static void join_path(char *out, uint16_t out_size, const char *base, const char *name) {
     if (strcmp(base, "/") == 0) {
         snprintf(out, out_size, "/%s", name);
@@ -97,6 +145,7 @@ bool browser_refresh(browser_state_t *state, char *status_line, uint16_t status_
     f_closedir(dirdes);
 
     state->entry_count = count;
+    sort_entries(state);
     if (state->selected >= state->entry_count && state->entry_count > 0) {
         state->selected = state->entry_count - 1;
     }
