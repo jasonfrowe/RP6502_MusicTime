@@ -46,6 +46,10 @@ int main(void) {
     uint8_t vsync_last;
     bool quit = false;
     bool browser_focus = true;
+    bool browser_dirty = true;
+    bool playback_dirty = true;
+    bool pos_dirty = false;
+    uint8_t pos_ui_div = 0;
 
     g_active_file[0] = '\0';
     g_status_line[0] = '\0';
@@ -64,12 +68,9 @@ int main(void) {
     }
 
     ui_draw_frame();
-    ui_render(browser,
-              g_active_file,
-              UI_PLAYBACK_STOPPED,
-              0,
-              g_status_line,
-              browser_focus);
+    ui_render_browser(browser, browser_focus);
+    ui_render_playback(g_active_file, UI_PLAYBACK_STOPPED, 0, g_status_line);
+    pos_dirty = false;
 
     vsync_last = RIA.vsync;
 
@@ -89,11 +90,13 @@ int main(void) {
         if (input_action_pressed(ACTION_UP)) {
             browser_move_up(browser);
             browser_focus = true;
+            browser_dirty = true;
         }
 
         if (input_action_pressed(ACTION_DOWN)) {
             browser_move_down(browser);
             browser_focus = true;
+            browser_dirty = true;
         }
 
         if (input_action_pressed(ACTION_BACK)) {
@@ -101,6 +104,9 @@ int main(void) {
                 strcpy(g_status_line, "Cannot go up");
             }
             browser_focus = true;
+            browser_dirty = true;
+            playback_dirty = true;
+            pos_dirty = true;
         }
 
         if (input_action_pressed(ACTION_SELECT)) {
@@ -131,9 +137,17 @@ int main(void) {
                         g_active_file[sizeof(g_active_file) - 1] = '\0';
                         playback_state = PLAYBACK_PLAYING;
                         browser_focus = false;
+                        browser_dirty = true;
+                        playback_dirty = true;
+                        pos_dirty = true;
                     } else {
                         playback_state = PLAYBACK_STOPPED;
+                        playback_dirty = true;
+                        pos_dirty = true;
                     }
+                } else {
+                    browser_dirty = true;
+                    playback_dirty = true;
                 }
             }
         }
@@ -143,11 +157,16 @@ int main(void) {
                 if (playback_state == PLAYBACK_PLAYING) {
                     playback_state = PLAYBACK_PAUSED;
                     strcpy(g_status_line, "Paused");
+                    playback_dirty = true;
+                    pos_dirty = true;
                 } else {
                     playback_state = PLAYBACK_PLAYING;
                     strcpy(g_status_line, "Playing");
+                    playback_dirty = true;
+                    pos_dirty = true;
                 }
                 browser_focus = false;
+                browser_dirty = true;
             }
         }
 
@@ -159,12 +178,17 @@ int main(void) {
             playback_state = PLAYBACK_STOPPED;
             strcpy(g_status_line, "Stopped");
             browser_focus = true;
+            browser_dirty = true;
+            playback_dirty = true;
+            pos_dirty = true;
         }
 
         if (input_action_pressed(ACTION_FF)) {
             if (player->fd >= 0) {
                 vgm_seek_seconds(player, SEEK_SECONDS, g_status_line, sizeof(g_status_line));
                 playback_state = PLAYBACK_PLAYING;
+                playback_dirty = true;
+                pos_dirty = true;
             }
         }
 
@@ -172,6 +196,8 @@ int main(void) {
             if (player->fd >= 0) {
                 vgm_seek_seconds(player, -SEEK_SECONDS, g_status_line, sizeof(g_status_line));
                 playback_state = PLAYBACK_PLAYING;
+                playback_dirty = true;
+                pos_dirty = true;
             }
         }
 
@@ -193,24 +219,48 @@ int main(void) {
                         g_active_file[sizeof(g_active_file) - 1] = '\0';
                         playback_state = PLAYBACK_PLAYING;
                         strcpy(g_status_line, "Auto-advanced to next track");
+                        browser_dirty = true;
+                        playback_dirty = true;
+                        pos_dirty = true;
                     } else {
                         playback_state = PLAYBACK_STOPPED;
+                        playback_dirty = true;
+                        pos_dirty = true;
                     }
                 } else {
                     playback_state = PLAYBACK_STOPPED;
                     strcpy(g_status_line, "End of list");
+                    playback_dirty = true;
+                    pos_dirty = true;
                 }
             }
+
+            if (++pos_ui_div >= 6) {
+                pos_ui_div = 0;
+                pos_dirty = true;
+            }
+        } else {
+            pos_ui_div = 0;
         }
 
-        ui_render(browser,
-                  g_active_file,
-                  playback_state == PLAYBACK_PLAYING
-                      ? UI_PLAYBACK_PLAYING
-                      : (playback_state == PLAYBACK_PAUSED ? UI_PLAYBACK_PAUSED : UI_PLAYBACK_STOPPED),
-                  vgm_position_ms(player),
-                  g_status_line,
-                  browser_focus);
+        if (browser_dirty) {
+            ui_render_browser(browser, browser_focus);
+            browser_dirty = false;
+        }
+
+        if (playback_dirty) {
+            ui_render_playback(g_active_file,
+                               playback_state == PLAYBACK_PLAYING
+                                   ? UI_PLAYBACK_PLAYING
+                                   : (playback_state == PLAYBACK_PAUSED ? UI_PLAYBACK_PAUSED : UI_PLAYBACK_STOPPED),
+                               vgm_position_ms(player),
+                               g_status_line);
+            playback_dirty = false;
+            pos_dirty = false;
+        } else if (pos_dirty) {
+            ui_render_position(vgm_position_ms(player));
+            pos_dirty = false;
+        }
     }
 
     vgm_close(player);

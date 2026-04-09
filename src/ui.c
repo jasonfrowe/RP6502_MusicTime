@@ -111,12 +111,7 @@ static const char *playback_label(ui_playback_state_t state) {
     return "Stopped";
 }
 
-void ui_render(const browser_state_t *browser,
-               const char *active_file,
-               ui_playback_state_t playback_state,
-               uint32_t position_ms,
-               const char *status_line,
-               bool browser_focus) {
+void ui_render_browser(const browser_state_t *browser, bool browser_focus) {
     uint16_t i;
     char line[81];
 
@@ -148,6 +143,14 @@ void ui_render(const browser_state_t *browser,
         }
     }
 
+}
+
+void ui_render_playback(const char *active_file,
+                        ui_playback_state_t playback_state,
+                        uint32_t position_ms,
+                        const char *status_line) {
+    char line[81];
+
     clear_row(54, UI_COL_DARKGREY);
     snprintf(line, sizeof(line), "State: %s", playback_label(playback_state));
     draw_text(1, 54, line, UI_COL_WHITE, UI_COL_DARKGREY);
@@ -164,4 +167,13 @@ void ui_render(const browser_state_t *browser,
     clear_row(59, UI_COL_BLUE);
     snprintf(line, sizeof(line), "Status: %s", status_line);
     draw_text(1, 59, line, UI_COL_WHITE, UI_COL_BLUE);
+}
+
+void ui_render_position(uint32_t position_ms) {
+    char line[81];
+
+    clear_row(55, UI_COL_DARKGREY);
+    snprintf(line, sizeof(line), "Pos: %lu.%03lus", (unsigned long)(position_ms / 1000u),
+             (unsigned long)(position_ms % 1000u));
+    draw_text(1, 55, line, UI_COL_WHITE, UI_COL_DARKGREY);
 }
