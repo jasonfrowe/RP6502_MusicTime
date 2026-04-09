@@ -25,6 +25,16 @@ static uint8_t carrier_level_for_channel(uint8_t ch) {
     return (attn > 62u) ? 0u : (uint8_t)(63u - attn);
 }
 
+static void trigger_peak_for_channel(uint8_t ch) {
+    uint8_t level = carrier_level_for_channel(ch);
+    if (level < 8u) {
+        level = 8u;
+    }
+    if (level > g_ch_peaks[ch]) {
+        g_ch_peaks[ch] = level;
+    }
+}
+
 static void opl_hw_write(uint8_t reg, uint8_t value) {
 #ifdef USE_NATIVE_OPL2
     RIA.addr1 = OPL_XRAM_ADDR + reg;
@@ -59,12 +69,31 @@ void opl_write(uint8_t reg, uint8_t value) {
         bool new_key_on = ((value >> 5u) & 1u) != 0u;
         if (!old_key_on && new_key_on) {
             uint8_t ch = (uint8_t)(reg - 0xB0u);
-            uint8_t level = carrier_level_for_channel(ch);
-            if (level < 8u) {
-                level = 8u;
+            trigger_peak_for_channel(ch);
+        }
+    }
+
+    /*
+     * Rhythm mode drums are triggered via 0xBD bits, not B0-B8 key-on.
+     * Map drum edges to channels 6-8 meters:
+     *   BD -> ch6, (SD or HH) -> ch7, (TOM or TC) -> ch8.
+     */
+    if (reg == 0xBDu) {
+        bool old_rhythm = ((old_value >> 5u) & 1u) != 0u;
+        bool new_rhythm = ((value >> 5u) & 1u) != 0u;
+        uint8_t rising = (uint8_t)(value & (uint8_t)~old_value);
+
+        if (new_rhythm) {
+            if ((rising & 0x10u) != 0u || (!old_rhythm && (value & 0x10u) != 0u)) {
+                trigger_peak_for_channel(6u);
             }
-            if (level > g_ch_peaks[ch]) {
-                g_ch_peaks[ch] = level;
+            if ((rising & 0x08u) != 0u || (rising & 0x01u) != 0u ||
+                (!old_rhythm && (((value & 0x08u) != 0u) || ((value & 0x01u) != 0u)))) {
+                trigger_peak_for_channel(7u);
+            }
+            if ((rising & 0x04u) != 0u || (rising & 0x02u) != 0u ||
+                (!old_rhythm && (((value & 0x04u) != 0u) || ((value & 0x02u) != 0u)))) {
+                trigger_peak_for_channel(8u);
             }
         }
     }
