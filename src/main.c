@@ -12,6 +12,29 @@
 #include "ui.h"
 #include "vgm.h"
 
+// Interrupt-driven vsync timing.
+// IRQ fires every vsync (~60 Hz) and increments the counter.
+// Main loop captures and clears it, then passes 735*ticks as the
+// sample budget to vgm_update so audio stays in sync with real time
+// even when the main loop occasionally takes more than one frame.
+#define CLI() __asm__ volatile ("cli" ::: "memory")
+#define SEI() __asm__ volatile ("sei" ::: "memory")
+#define RIA_IRQ_VEC (*(volatile uint16_t *)0xFFFE)
+
+static volatile uint8_t g_vsync_count = 0;
+static volatile uint8_t g_irq_vsync_last = 0;
+
+__attribute__((interrupt)) void vsync_irq_handler(void) {
+    uint8_t vs = RIA.vsync;
+    if (vs != g_irq_vsync_last) {
+        g_irq_vsync_last = vs;
+        if (g_vsync_count < 255u) {
+            g_vsync_count++;
+        }
+    }
+    (void)RIA.irq;
+}
+
 typedef enum {
     PLAYBACK_STOPPED = 0,
     PLAYBACK_PLAYING,
@@ -43,7 +66,7 @@ int main(void) {
     browser_state_t *browser = &g_browser;
     vgm_player_t *player = &g_player;
     playback_state_t playback_state = PLAYBACK_STOPPED;
-    uint8_t vsync_last;
+    uint8_t ticks;
     bool quit = false;
     bool browser_focus = true;
     bool browser_dirty = true;
@@ -72,14 +95,33 @@ int main(void) {
     ui_render_playback(g_active_file, UI_PLAYBACK_STOPPED, 0, g_status_line);
     pos_dirty = false;
 
-    vsync_last = RIA.vsync;
+    g_irq_vsync_last = RIA.vsync;
+    RIA_IRQ_VEC = (uint16_t)vsync_irq_handler;
+    RIA.irq = 1;
+    CLI();
 
     while (!quit) {
         bool track_ended = false;
 
-        while (RIA.vsync == vsync_last) {
+        SEI();
+        ticks = g_vsync_count;
+        g_vsync_count = 0;
+        CLI();
+
+        if (ticks == 0u) {
+            uint8_t vsync_spin = RIA.vsync;
+            while (RIA.vsync == vsync_spin) {
+            }
+
+            // Fallback path: consume one frame via direct VSYNC polling.
+            // Clear any late IRQ count for that same frame so we don't run at double tempo.
+            SEI();
+            g_vsync_count = 0;
+            CLI();
+            g_irq_vsync_last = RIA.vsync;
+            (void)RIA.irq;
+            ticks = 1u;
         }
-        vsync_last = RIA.vsync;
 
         input_poll();
 
@@ -159,7 +201,20 @@ int main(void) {
                     strcpy(g_status_line, "Paused");
                     playback_dirty = true;
                     pos_dirty = true;
-                } else {
+                    if (ticks == 0u) {
+                        uint8_t vsync_spin = RIA.vsync;
+                        while (RIA.vsync == vsync_spin) {
+                        }
+
+                        // Fallback path: we consumed one frame via direct VSYNC polling.
+                        // Clear any late IRQ tick for that same frame to avoid double-speed playback.
+                        SEI();
+                        g_vsync_count = 0;
+                        CLI();
+                        g_irq_vsync_last = RIA.vsync;
+                        (void)RIA.irq;
+                        ticks = 1u;
+                    }
                     playback_state = PLAYBACK_PLAYING;
                     strcpy(g_status_line, "Playing");
                     playback_dirty = true;
@@ -202,7 +257,7 @@ int main(void) {
         }
 
         if (playback_state == PLAYBACK_PLAYING) {
-            vgm_update(player, 735u, &track_ended, g_status_line, sizeof(g_status_line));
+            vgm_update(player, 735u * (uint32_t)ticks, &track_ended, g_status_line, sizeof(g_status_line));
             if (track_ended) {
                 int next = browser_next_playable_index(browser, browser->selected);
                 if (next >= 0) {
@@ -235,7 +290,8 @@ int main(void) {
                 }
             }
 
-            if (++pos_ui_div >= 6) {
+            pos_ui_div += ticks;
+            if (pos_ui_div >= 6u) {
                 pos_ui_div = 0;
                 pos_dirty = true;
             }
