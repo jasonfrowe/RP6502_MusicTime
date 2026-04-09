@@ -73,8 +73,8 @@ int main(void) {
     bool playback_dirty = true;
     bool pos_dirty = false;
     uint8_t pos_ui_div = 0;
-    uint8_t up_repeat_counter = 0;
-    uint8_t down_repeat_counter = 0;
+    uint16_t up_repeat_counter = 0;
+    uint16_t down_repeat_counter = 0;
 
     g_active_file[0] = '\0';
     g_status_line[0] = '\0';
