@@ -10,6 +10,8 @@ static gamepad_t pads[GAMEPAD_COUNT];
 static gamepad_t prev_pads[GAMEPAD_COUNT];
 static bool action_gate_locked = false;
 
+#define is_shift_down() (key_down(KEY_LSHIFT) || key_down(KEY_RSHIFT))
+
 static bool key_down(uint8_t keycode) {
     return (keyboard[keycode >> 3] & (1u << (keycode & 7u))) != 0;
 }
@@ -61,9 +63,19 @@ static bool pad_mask_pressed(uint8_t field, uint8_t mask) {
 static bool action_down_raw(input_action_t action) {
     switch (action) {
     case ACTION_UP:
-        return key_down(KEY_UP) || pad_mask_down(0, GP_DPAD_UP);
+        return (key_down(KEY_UP) || pad_mask_down(0, GP_DPAD_UP)) && !is_shift_down();
     case ACTION_DOWN:
-        return key_down(KEY_DOWN) || pad_mask_down(0, GP_DPAD_DOWN);
+        return (key_down(KEY_DOWN) || pad_mask_down(0, GP_DPAD_DOWN)) && !is_shift_down();
+    case ACTION_PAGE_UP:
+        return key_down(KEY_UP) && is_shift_down();
+    case ACTION_PAGE_DOWN:
+        return key_down(KEY_DOWN) && is_shift_down();
+    case ACTION_PREV_TRACK:
+        return key_down(KEY_LEFT);
+    case ACTION_NEXT_TRACK:
+        return key_down(KEY_RIGHT);
+    case ACTION_LOOP_TOGGLE:
+        return key_down(KEY_L);
     case ACTION_SELECT:
         return key_down(KEY_ENTER) || pad_mask_down(1, GP_BTN_A);
     case ACTION_BACK:
@@ -86,9 +98,19 @@ static bool action_down_raw(input_action_t action) {
 static bool action_pressed_raw(input_action_t action) {
     switch (action) {
     case ACTION_UP:
-        return key_pressed(KEY_UP) || pad_mask_pressed(0, GP_DPAD_UP);
+        return key_pressed(KEY_UP) && !is_shift_down();
     case ACTION_DOWN:
-        return key_pressed(KEY_DOWN) || pad_mask_pressed(0, GP_DPAD_DOWN);
+        return key_pressed(KEY_DOWN) && !is_shift_down();
+    case ACTION_PAGE_UP:
+        return key_pressed(KEY_UP) && is_shift_down();
+    case ACTION_PAGE_DOWN:
+        return key_pressed(KEY_DOWN) && is_shift_down();
+    case ACTION_PREV_TRACK:
+        return key_pressed(KEY_LEFT);
+    case ACTION_NEXT_TRACK:
+        return key_pressed(KEY_RIGHT);
+    case ACTION_LOOP_TOGGLE:
+        return key_pressed(KEY_L);
     case ACTION_SELECT:
         return key_pressed(KEY_ENTER) || pad_mask_pressed(1, GP_BTN_A);
     case ACTION_BACK:
@@ -173,10 +195,13 @@ bool input_action_held(input_action_t action) {
 }
 
 bool input_take_pressed_action(input_action_t *action_out) {
-    static const input_action_t order[ACTION_COUNT] = {
+    static const input_action_t order[] = {
         ACTION_QUIT,
         ACTION_UP,
         ACTION_DOWN,
+        ACTION_PREV_TRACK,
+        ACTION_NEXT_TRACK,
+        ACTION_LOOP_TOGGLE,
         ACTION_BACK,
         ACTION_SELECT,
         ACTION_PLAY_PAUSE,
@@ -193,7 +218,7 @@ bool input_take_pressed_action(input_action_t *action_out) {
         return false;
     }
 
-    for (i = 0; i < ACTION_COUNT; ++i) {
+    for (i = 0; i < (uint8_t)(sizeof(order) / sizeof(order[0])); ++i) {
         input_action_t action = order[i];
         if (action_pressed_raw(action)) {
             action_gate_locked = true;

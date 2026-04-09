@@ -158,6 +158,47 @@ void browser_move_down(browser_state_t *state) {
     }
 }
 
+void browser_page_up(browser_state_t *state) {
+    if (state->entry_count == 0) {
+        return;
+    }
+    
+    uint16_t cursor_offset = (state->selected >= state->scroll) ? 
+                             (state->selected - state->scroll) : 0;
+    
+    if (state->scroll >= VIEW_ROWS) {
+        state->scroll -= VIEW_ROWS;
+    } else if (state->scroll > 0) {
+        state->scroll = 0;
+    }
+    
+    state->selected = state->scroll + cursor_offset;
+    if (state->selected >= state->entry_count) {
+        state->selected = state->entry_count - 1;
+    }
+}
+
+void browser_page_down(browser_state_t *state) {
+    if (state->entry_count == 0) {
+        return;
+    }
+    
+    uint16_t cursor_offset = (state->selected >= state->scroll) ? 
+                             (state->selected - state->scroll) : 0;
+    
+    uint16_t next_scroll = state->scroll + VIEW_ROWS;
+    if (next_scroll < state->entry_count) {
+        state->scroll = next_scroll;
+    } else if (state->scroll + VIEW_ROWS <= state->entry_count) {
+        state->scroll = (state->entry_count > VIEW_ROWS) ? (state->entry_count - VIEW_ROWS) : 0;
+    }
+    
+    state->selected = state->scroll + cursor_offset;
+    if (state->selected >= state->entry_count) {
+        state->selected = state->entry_count - 1;
+    }
+}
+
 bool browser_go_parent(browser_state_t *state, char *status_line, uint16_t status_size) {
     char *slash;
 
@@ -220,6 +261,22 @@ int browser_next_playable_index(const browser_state_t *state, uint16_t start_ind
     for (i = (uint16_t)(start_index + 1); i < state->entry_count; ++i) {
         if (!state->entries[i].is_dir && strcmp(state->entries[i].name, "..") != 0) {
             return (int)i;
+        }
+    }
+
+    return -1;
+}
+
+int browser_prev_playable_index(const browser_state_t *state, uint16_t start_index) {
+    int i;
+
+    if (state->entry_count == 0 || start_index == 0) {
+        return -1;
+    }
+
+    for (i = (int)start_index - 1; i >= 0; --i) {
+        if (!state->entries[i].is_dir && strcmp(state->entries[i].name, "..") != 0) {
+            return i;
         }
     }
 

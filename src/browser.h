@@ -24,6 +24,8 @@ void browser_init(browser_state_t *state, const char *start_path);
 bool browser_refresh(browser_state_t *state, char *status_line, uint16_t status_size);
 void browser_move_up(browser_state_t *state);
 void browser_move_down(browser_state_t *state);
+void browser_page_up(browser_state_t *state);
+void browser_page_down(browser_state_t *state);
 bool browser_activate_selected(browser_state_t *state,
                                char *out_file_path,
                                uint16_t out_file_path_size,
@@ -31,5 +33,6 @@ bool browser_activate_selected(browser_state_t *state,
                                uint16_t status_size);
 bool browser_go_parent(browser_state_t *state, char *status_line, uint16_t status_size);
 int browser_next_playable_index(const browser_state_t *state, uint16_t start_index);
+int browser_prev_playable_index(const browser_state_t *state, uint16_t start_index);
 
 #endif

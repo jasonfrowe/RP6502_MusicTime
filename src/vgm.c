@@ -132,6 +132,7 @@ bool vgm_open(vgm_player_t *player, const char *path, char *status_line, uint16_
 
     memset(player, 0, sizeof(*player));
     player->fd = -1;
+    player->loop_enabled = true;
 
     player->fd = open(path, O_RDONLY);
     if (player->fd < 0) {
@@ -245,7 +246,7 @@ static bool parse_next_command(vgm_player_t *player, bool *track_ended, char *st
         player->wait_samples = 882u;
         return true;
     case 0x66:
-        if (player->has_loop) {
+        if (player->has_loop && player->loop_enabled) {
             if (lseek(player->fd, (long)player->loop_offset, SEEK_SET) >= 0) {
                 player->buffer_pos = 0;
                 player->buffer_size = 0;

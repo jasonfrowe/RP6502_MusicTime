@@ -13,6 +13,7 @@ typedef struct {
     uint32_t wait_samples;
     bool reached_end;
     bool has_loop;
+    bool loop_enabled;
 
     /* GD3 metadata (ASCII-extracted from UTF-16 LE) */
     uint32_t gd3_offset;
