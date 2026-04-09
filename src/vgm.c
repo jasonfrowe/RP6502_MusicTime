@@ -153,6 +153,20 @@ bool vgm_open(vgm_player_t *player, const char *path, char *status_line, uint16_
         return false;
     }
 
+    /* VGM 1.51+ has chip clock fields. Offset 0x50 = YM3812 (OPL2) clock.
+     * If non-zero the file targets OPL2; if zero it was made for a different
+     * chip (e.g., OPL3/YMF262, YM2612, etc.) and we cannot play it. */
+    {
+        uint32_t version = read_u32_le(&header[0x08]);
+        if (version >= 0x151u && (uint16_t)got >= 0x54u) {
+            uint32_t ym3812_clk = read_u32_le(&header[0x50]);
+            if (ym3812_clk == 0u) {
+                snprintf(status_line, status_size, "Incompatible chip (not OPL2/YM3812)");
+                vgm_close(player);
+                return false;
+            }
+        }
+    }
     data_rel = read_u32_le(&header[0x34]);
     if (data_rel == 0) {
         player->data_offset = 0x40;
