@@ -497,6 +497,9 @@ int main(void) {
                     if (browser->selected < browser->scroll) {
                         browser->scroll = browser->selected;
                     }
+                    if (browser->selected >= browser->scroll + 44u) {
+                        browser->scroll = browser->selected - 43u;
+                    }
                     full_path_from_entry(browser, browser->selected, next_path, sizeof(next_path));
                     vgm_close(player);
                     opl_init();
