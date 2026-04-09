@@ -176,6 +176,7 @@ int main(void) {
                     if (vgm_open(player, selected_path, g_status_line, sizeof(g_status_line))) {
                         strncpy(g_active_file, selected_path, sizeof(g_active_file) - 1);
                         g_active_file[sizeof(g_active_file) - 1] = '\0';
+                        opl_set_muted(false);
                         playback_state = PLAYBACK_PLAYING;
                         browser_focus = false;
                         browser_dirty = true;
@@ -196,9 +197,11 @@ int main(void) {
             case ACTION_PLAY_PAUSE:
                 if (player->fd >= 0) {
                     if (playback_state == PLAYBACK_PLAYING) {
+                        opl_set_muted(true);
                         playback_state = PLAYBACK_PAUSED;
                         strcpy(g_status_line, "Paused");
                     } else {
+                        opl_set_muted(false);
                         playback_state = PLAYBACK_PLAYING;
                         strcpy(g_status_line, "Playing");
                     }
@@ -212,6 +215,7 @@ int main(void) {
                 if (player->fd >= 0) {
                     vgm_close(player);
                 }
+                opl_set_muted(false);
                 opl_init();
                 playback_state = PLAYBACK_STOPPED;
                 strcpy(g_status_line, "Stopped");
@@ -222,16 +226,26 @@ int main(void) {
                 break;
             case ACTION_FF:
                 if (player->fd >= 0) {
+                    bool resume_audio = (playback_state != PLAYBACK_PAUSED);
+                    opl_set_muted(true);
                     vgm_seek_seconds(player, SEEK_SECONDS, g_status_line, sizeof(g_status_line));
-                    playback_state = PLAYBACK_PLAYING;
+                    if (resume_audio) {
+                        opl_set_muted(false);
+                        playback_state = PLAYBACK_PLAYING;
+                    }
                     playback_dirty = true;
                     pos_dirty = true;
                 }
                 break;
             case ACTION_RW:
                 if (player->fd >= 0) {
+                    bool resume_audio = (playback_state != PLAYBACK_PAUSED);
+                    opl_set_muted(true);
                     vgm_seek_seconds(player, -SEEK_SECONDS, g_status_line, sizeof(g_status_line));
-                    playback_state = PLAYBACK_PLAYING;
+                    if (resume_audio) {
+                        opl_set_muted(false);
+                        playback_state = PLAYBACK_PLAYING;
+                    }
                     playback_dirty = true;
                     pos_dirty = true;
                 }
@@ -257,6 +271,7 @@ int main(void) {
                     if (vgm_open(player, next_path, g_status_line, sizeof(g_status_line))) {
                         strncpy(g_active_file, next_path, sizeof(g_active_file) - 1);
                         g_active_file[sizeof(g_active_file) - 1] = '\0';
+                        opl_set_muted(false);
                         playback_state = PLAYBACK_PLAYING;
                         strcpy(g_status_line, "Auto-advanced to next track");
                         browser_dirty = true;
