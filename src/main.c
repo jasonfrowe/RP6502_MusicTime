@@ -73,6 +73,8 @@ int main(void) {
     bool playback_dirty = true;
     bool pos_dirty = false;
     uint8_t pos_ui_div = 0;
+    uint8_t up_repeat_counter = 0;
+    uint8_t down_repeat_counter = 0;
 
     g_active_file[0] = '\0';
     g_status_line[0] = '\0';
@@ -131,16 +133,22 @@ int main(void) {
             case ACTION_QUIT:
                 quit = true;
                 break;
-            case ACTION_UP:
+            case ACTION_UP: {
+                uint16_t old_selected = browser->selected;
                 browser_move_up(browser);
                 browser_focus = true;
-                browser_dirty = true;
+                ui_render_browser_selection(browser, browser_focus, old_selected);
+                up_repeat_counter = 0;
                 break;
-            case ACTION_DOWN:
+            }
+            case ACTION_DOWN: {
+                uint16_t old_selected = browser->selected;
                 browser_move_down(browser);
                 browser_focus = true;
-                browser_dirty = true;
+                ui_render_browser_selection(browser, browser_focus, old_selected);
+                down_repeat_counter = 0;
                 break;
+            }
             case ACTION_BACK:
                 if (!browser_go_parent(browser, g_status_line, sizeof(g_status_line))) {
                     strcpy(g_status_line, "Cannot go up");
@@ -252,6 +260,35 @@ int main(void) {
                 break;
             default:
                 break;
+            }
+        }
+
+        // Auto-repeat for navigation when keys are held
+        if (browser_focus) {
+            if (input_action_held(ACTION_UP)) {
+                if (up_repeat_counter < 255) {
+                    up_repeat_counter++;
+                }
+                if (up_repeat_counter > 30 && up_repeat_counter % 6 == 0) {
+                    uint16_t old_selected = browser->selected;
+                    browser_move_up(browser);
+                    ui_render_browser_selection(browser, browser_focus, old_selected);
+                }
+            } else {
+                up_repeat_counter = 0;
+            }
+
+            if (input_action_held(ACTION_DOWN)) {
+                if (down_repeat_counter < 255) {
+                    down_repeat_counter++;
+                }
+                if (down_repeat_counter > 30 && down_repeat_counter % 6 == 0) {
+                    uint16_t old_selected = browser->selected;
+                    browser_move_down(browser);
+                    ui_render_browser_selection(browser, browser_focus, old_selected);
+                }
+            } else {
+                down_repeat_counter = 0;
             }
         }
 

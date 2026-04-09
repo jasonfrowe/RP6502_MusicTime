@@ -20,6 +20,10 @@ static bool ends_with_vgm(const char *name) {
            (tolower((unsigned char)name[len - 1]) == 'm');
 }
 
+static bool is_macos_resource_fork(const char *name) {
+    return name[0] == '.' && name[1] == '_';
+}
+
 static void safe_copy(char *dst, const char *src, uint16_t size) {
     if (size == 0) {
         return;
@@ -69,6 +73,10 @@ bool browser_refresh(browser_state_t *state, char *status_line, uint16_t status_
         }
 
         if (strcmp(item.fname, ".") == 0 || strcmp(item.fname, "..") == 0) {
+            continue;
+        }
+
+        if (is_macos_resource_fork(item.fname)) {
             continue;
         }
 

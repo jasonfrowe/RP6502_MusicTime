@@ -145,6 +145,40 @@ void ui_render_browser(const browser_state_t *browser, bool browser_focus) {
 
 }
 
+static void draw_browser_row(const browser_state_t *browser, bool browser_focus, uint16_t idx) {
+    char line[81];
+
+    if (idx < browser->scroll || idx >= browser->scroll + LIST_ROWS || idx >= browser->entry_count) {
+        return;
+    }
+
+    uint16_t view_row = (uint16_t)(idx - browser->scroll);
+    uint8_t screen_row = (uint8_t)(LIST_TOP + view_row);
+
+    clear_row(screen_row, UI_COL_BLACK);
+
+    if (browser->entries[idx].is_dir) {
+        snprintf(line, sizeof(line), "[DIR] %s", browser->entries[idx].name);
+    } else {
+        snprintf(line, sizeof(line), "      %s", browser->entries[idx].name);
+    }
+
+    if (idx == browser->selected && browser_focus) {
+        draw_text(1, screen_row, line, UI_COL_BLACK, UI_COL_YELLOW);
+    } else if (idx == browser->selected) {
+        draw_text(1, screen_row, line, UI_COL_BLACK, UI_COL_CYAN);
+    } else {
+        draw_text(1, screen_row, line, UI_COL_WHITE, UI_COL_BLACK);
+    }
+}
+
+void ui_render_browser_selection(const browser_state_t *browser, bool browser_focus, uint16_t old_selected) {
+    if (old_selected != browser->selected) {
+        draw_browser_row(browser, browser_focus, old_selected);
+    }
+    draw_browser_row(browser, browser_focus, browser->selected);
+}
+
 void ui_render_playback(const char *active_file,
                         ui_playback_state_t playback_state,
                         uint32_t position_ms,
