@@ -28,5 +28,10 @@ rp6502_executable(MusicTime
 )
 
 target_sources(MusicTime PRIVATE
+    src/browser.c
+    src/input.c
     src/main.c
+    src/opl.c
+    src/ui.c
+    src/vgm.c
 )

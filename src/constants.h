@@ -1,0 +1,54 @@
+#ifndef CONSTANTS_H
+#define CONSTANTS_H
+
+#define SCREEN_COLS 80
+#define SCREEN_ROWS 60
+#define BYTES_PER_CHAR 3
+
+#define TEXT_CONFIG_ADDR 0xC000
+
+#define KEYBOARD_XRAM_ADDR 0xFFA0
+#define GAMEPAD_XRAM_ADDR 0xFF78
+
+#define GAMEPAD_COUNT 4
+#define GAMEPAD_DATA_SIZE 10
+#define KEYBOARD_BYTES 32
+
+#define GP_CONNECTED 0x80
+
+#define GP_DPAD_UP 0x01
+#define GP_DPAD_DOWN 0x02
+#define GP_DPAD_LEFT 0x04
+#define GP_DPAD_RIGHT 0x08
+
+#define GP_BTN_A 0x01
+#define GP_BTN_B 0x02
+#define GP_BTN_L1 0x40
+#define GP_BTN_R1 0x80
+
+#define GP_BTN_SELECT 0x04
+#define GP_BTN_START 0x08
+#define GP_BTN_HOME 0x10
+
+#define UI_COL_BLACK 0
+#define UI_COL_DARKGREY 8
+#define UI_COL_WHITE 15
+#define UI_COL_BLUE 12
+#define UI_COL_GREEN 10
+#define UI_COL_YELLOW 11
+#define UI_COL_RED 9
+#define UI_COL_CYAN 14
+
+#ifdef USE_NATIVE_OPL2
+#define OPL_XRAM_ADDR 0xFE00
+#else
+#define OPL_XRAM_ADDR 0xFF00
+#endif
+
+#define VGM_STREAM_BUFFER_SIZE 512
+#define BROWSER_MAX_ENTRIES 48
+#define MAX_ENTRY_NAME_LEN 63
+#define MAX_PATH_LEN 255
+#define SEEK_SECONDS 5
+
+#endif

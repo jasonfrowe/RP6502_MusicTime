@@ -1,0 +1,133 @@
+#include "input.h"
+
+#include <rp6502.h>
+
+#include "usb_hid_keys.h"
+
+static uint8_t keyboard[KEYBOARD_BYTES];
+static uint8_t prev_keyboard[KEYBOARD_BYTES];
+static gamepad_t pads[GAMEPAD_COUNT];
+static gamepad_t prev_pads[GAMEPAD_COUNT];
+
+static bool key_down(uint8_t keycode) {
+    return (keyboard[keycode >> 3] & (1u << (keycode & 7u))) != 0;
+}
+
+static bool key_pressed(uint8_t keycode) {
+    return ((keyboard[keycode >> 3] & (1u << (keycode & 7u))) != 0) &&
+           ((prev_keyboard[keycode >> 3] & (1u << (keycode & 7u))) == 0);
+}
+
+static uint8_t active_pad_index(void) {
+    uint8_t i;
+    for (i = 0; i < GAMEPAD_COUNT; ++i) {
+        if ((pads[i].dpad & GP_CONNECTED) != 0) {
+            return i;
+        }
+    }
+    return 0xFF;
+}
+
+static bool pad_mask_down(uint8_t field, uint8_t mask) {
+    uint8_t idx = active_pad_index();
+    if (idx == 0xFF) {
+        return false;
+    }
+    if (field == 0) {
+        return (pads[idx].dpad & mask) != 0;
+    }
+    if (field == 1) {
+        return (pads[idx].btn0 & mask) != 0;
+    }
+    return (pads[idx].btn1 & mask) != 0;
+}
+
+static bool pad_mask_pressed(uint8_t field, uint8_t mask) {
+    uint8_t idx = active_pad_index();
+    if (idx == 0xFF) {
+        return false;
+    }
+
+    if (field == 0) {
+        return ((pads[idx].dpad & mask) != 0) && ((prev_pads[idx].dpad & mask) == 0);
+    }
+    if (field == 1) {
+        return ((pads[idx].btn0 & mask) != 0) && ((prev_pads[idx].btn0 & mask) == 0);
+    }
+    return ((pads[idx].btn1 & mask) != 0) && ((prev_pads[idx].btn1 & mask) == 0);
+}
+
+void input_init(void) {
+    xreg_ria_keyboard(KEYBOARD_XRAM_ADDR);
+    xreg_ria_gamepad(GAMEPAD_XRAM_ADDR);
+}
+
+void input_poll(void) {
+    uint8_t i;
+    uint8_t p;
+
+    for (i = 0; i < KEYBOARD_BYTES; ++i) {
+        prev_keyboard[i] = keyboard[i];
+    }
+
+    for (p = 0; p < GAMEPAD_COUNT; ++p) {
+        prev_pads[p] = pads[p];
+    }
+
+    RIA.addr0 = KEYBOARD_XRAM_ADDR;
+    RIA.step0 = 1;
+    for (i = 0; i < KEYBOARD_BYTES; ++i) {
+        keyboard[i] = RIA.rw0;
+    }
+
+    RIA.addr0 = GAMEPAD_XRAM_ADDR;
+    RIA.step0 = 1;
+    for (p = 0; p < GAMEPAD_COUNT; ++p) {
+        pads[p].dpad = RIA.rw0;
+        pads[p].sticks = RIA.rw0;
+        pads[p].btn0 = RIA.rw0;
+        pads[p].btn1 = RIA.rw0;
+        pads[p].lx = (int8_t)RIA.rw0;
+        pads[p].ly = (int8_t)RIA.rw0;
+        pads[p].rx = (int8_t)RIA.rw0;
+        pads[p].ry = (int8_t)RIA.rw0;
+        pads[p].l2 = RIA.rw0;
+        pads[p].r2 = RIA.rw0;
+    }
+}
+
+bool input_action_pressed(input_action_t action) {
+    switch (action) {
+    case ACTION_UP:
+        return key_pressed(KEY_UP) || pad_mask_pressed(0, GP_DPAD_UP);
+    case ACTION_DOWN:
+        return key_pressed(KEY_DOWN) || pad_mask_pressed(0, GP_DPAD_DOWN);
+    case ACTION_SELECT:
+        return key_pressed(KEY_ENTER) || pad_mask_pressed(1, GP_BTN_A);
+    case ACTION_BACK:
+        return key_pressed(KEY_BACKSPACE) || pad_mask_pressed(1, GP_BTN_B);
+    case ACTION_PLAY_PAUSE:
+        return key_pressed(KEY_SPACE) || pad_mask_pressed(2, GP_BTN_START);
+    case ACTION_STOP:
+        return key_pressed(KEY_S) || pad_mask_pressed(2, GP_BTN_SELECT);
+    case ACTION_FF:
+        return key_pressed(KEY_F) || pad_mask_pressed(1, GP_BTN_R1);
+    case ACTION_RW:
+        return key_pressed(KEY_R) || pad_mask_pressed(1, GP_BTN_L1);
+    case ACTION_QUIT:
+        return key_pressed(KEY_Q) || key_pressed(KEY_ESC) || pad_mask_pressed(2, GP_BTN_HOME);
+    default:
+        return false;
+    }
+}
+
+bool input_action_held(input_action_t action) {
+    switch (action) {
+    case ACTION_UP:
+        return key_down(KEY_UP) || pad_mask_down(0, GP_DPAD_UP);
+    case ACTION_DOWN:
+        return key_down(KEY_DOWN) || pad_mask_down(0, GP_DPAD_DOWN);
+    default:
+        return input_action_pressed(action);
+    }
+}
