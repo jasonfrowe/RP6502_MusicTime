@@ -120,7 +120,7 @@ int main(void) {
     uint16_t down_repeat_counter = 0;
     uint16_t page_up_repeat_counter = 0;
     uint16_t page_down_repeat_counter = 0;
-    bool loop_enabled = true;
+    bool loop_enabled = false;
     uint32_t frame_counter = 0;
     uint32_t last_left_press_frame = 0xFFFFFFFFu;
 

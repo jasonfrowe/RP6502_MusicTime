@@ -132,7 +132,7 @@ bool vgm_open(vgm_player_t *player, const char *path, char *status_line, uint16_
 
     memset(player, 0, sizeof(*player));
     player->fd = -1;
-    player->loop_enabled = true;
+    player->loop_enabled = false;
 
     player->fd = open(path, O_RDONLY);
     if (player->fd < 0) {
