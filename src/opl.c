@@ -20,6 +20,11 @@ static const uint8_t k_carrier_tl[9] = {
     0x53, 0x54, 0x55,   /* channels 6-8 */
 };
 
+static uint8_t carrier_level_for_channel(uint8_t ch) {
+    uint8_t attn = g_opl_shadow[k_carrier_tl[ch]] & 0x3Fu;
+    return (attn > 62u) ? 0u : (uint8_t)(63u - attn);
+}
+
 static void opl_hw_write(uint8_t reg, uint8_t value) {
 #ifdef USE_NATIVE_OPL2
     RIA.addr1 = OPL_XRAM_ADDR + reg;
@@ -42,6 +47,28 @@ void opl_config(uint8_t enable, uint16_t addr) {
 }
 
 void opl_write(uint8_t reg, uint8_t value) {
+    uint8_t old_value = g_opl_shadow[reg];
+
+    /*
+     * Meter pulse on note trigger: when key-on transitions 0 -> 1 on B0-B8.
+     * This avoids a constantly-lit meter on sustained notes and gives
+     * a more dynamic eye-candy effect.
+     */
+    if (reg >= 0xB0u && reg <= 0xB8u) {
+        bool old_key_on = ((old_value >> 5u) & 1u) != 0u;
+        bool new_key_on = ((value >> 5u) & 1u) != 0u;
+        if (!old_key_on && new_key_on) {
+            uint8_t ch = (uint8_t)(reg - 0xB0u);
+            uint8_t level = carrier_level_for_channel(ch);
+            if (level < 8u) {
+                level = 8u;
+            }
+            if (level > g_ch_peaks[ch]) {
+                g_ch_peaks[ch] = level;
+            }
+        }
+    }
+
     g_opl_shadow[reg] = value;
     if (!g_opl_muted) {
         opl_hw_write(reg, value);
@@ -84,19 +111,11 @@ bool opl_is_muted(void) {
 void opl_decay_peaks(void) {
     uint8_t ch;
     for (ch = 0u; ch < 9u; ++ch) {
-        /* Decay existing peak first */
+        /* Natural falloff; peaks are injected only on key-on edges in opl_write(). */
         if (g_ch_peaks[ch] > 1u) {
             g_ch_peaks[ch] = (uint8_t)(g_ch_peaks[ch] - 2u);
         } else {
             g_ch_peaks[ch] = 0u;
-        }
-        /* If this channel has key-on, update from current carrier TL */
-        if ((g_opl_shadow[0xB0u + ch] >> 5u) & 1u) {
-            uint8_t attn = g_opl_shadow[k_carrier_tl[ch]] & 0x3Fu;
-            uint8_t level = (attn > 62u) ? 0u : (uint8_t)(63u - attn);
-            if (level > g_ch_peaks[ch]) {
-                g_ch_peaks[ch] = level;
-            }
         }
     }
 }
