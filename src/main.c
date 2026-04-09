@@ -94,6 +94,17 @@ static bool start_track_from_selected(browser_state_t *browser,
     return true;
 }
 
+static void refresh_browser_after_selection_change(const browser_state_t *browser,
+                                                   bool browser_focus,
+                                                   uint16_t old_selected,
+                                                   uint16_t old_scroll) {
+    if (browser->scroll != old_scroll) {
+        ui_render_browser(browser, browser_focus);
+    } else {
+        ui_render_browser_selection(browser, browser_focus, old_selected);
+    }
+}
+
 int main(void) {
     browser_state_t *browser = &g_browser;
     vgm_player_t *player = &g_player;
@@ -205,6 +216,8 @@ int main(void) {
                 if (player->fd >= 0 && (frame_counter - last_left_press_frame) <= 20u) {
                     int prev = browser_prev_playable_index(browser, browser->selected);
                     if (prev >= 0) {
+                        uint16_t old_selected = browser->selected;
+                        uint16_t old_scroll = browser->scroll;
                         browser->selected = (uint16_t)prev;
                         if (browser->selected < browser->scroll) {
                             browser->scroll = browser->selected;
@@ -222,7 +235,7 @@ int main(void) {
                                                       sizeof(g_status_line))) {
                             strcpy(g_status_line, "Previous track");
                         }
-                        browser_dirty = true;
+                        refresh_browser_after_selection_change(browser, browser_focus, old_selected, old_scroll);
                         playback_dirty = true;
                         pos_dirty = true;
                     } else {
@@ -244,6 +257,8 @@ int main(void) {
             case ACTION_NEXT_TRACK: {
                 int next = browser_next_playable_index(browser, browser->selected);
                 if (next >= 0) {
+                    uint16_t old_selected = browser->selected;
+                    uint16_t old_scroll = browser->scroll;
                     browser->selected = (uint16_t)next;
                     if (browser->selected < browser->scroll) {
                         browser->scroll = browser->selected;
@@ -261,7 +276,7 @@ int main(void) {
                                                   sizeof(g_status_line))) {
                         strcpy(g_status_line, "Next track");
                     }
-                    browser_dirty = true;
+                    refresh_browser_after_selection_change(browser, browser_focus, old_selected, old_scroll);
                     playback_dirty = true;
                     pos_dirty = true;
                 } else {
@@ -314,13 +329,14 @@ int main(void) {
                     vgm_close(player);
                     opl_init();
                     if (vgm_open(player, selected_path, g_status_line, sizeof(g_status_line))) {
+                        uint16_t old_selected = browser->selected;
                         player->loop_enabled = loop_enabled;
                         strncpy(g_active_file, selected_path, sizeof(g_active_file) - 1);
                         g_active_file[sizeof(g_active_file) - 1] = '\0';
                         opl_set_muted(false);
                         playback_state = PLAYBACK_PLAYING;
                         browser_focus = false;
-                        browser_dirty = true;
+                        ui_render_browser_selection(browser, browser_focus, old_selected);
                         playback_dirty = true;
                         pos_dirty = true;
                     } else {
@@ -348,8 +364,10 @@ int main(void) {
                     }
                     playback_dirty = true;
                     pos_dirty = true;
-                    browser_focus = false;
-                    browser_dirty = true;
+                    if (browser_focus) {
+                        browser_focus = false;
+                        ui_render_browser_selection(browser, browser_focus, browser->selected);
+                    }
                 }
                 break;
             case ACTION_STOP:
@@ -360,8 +378,10 @@ int main(void) {
                 opl_init();
                 playback_state = PLAYBACK_STOPPED;
                 strcpy(g_status_line, "Stopped");
-                browser_focus = true;
-                browser_dirty = true;
+                if (!browser_focus) {
+                    browser_focus = true;
+                    ui_render_browser_selection(browser, browser_focus, browser->selected);
+                }
                 playback_dirty = true;
                 pos_dirty = true;
                 break;
@@ -471,6 +491,8 @@ int main(void) {
                 int next = browser_next_playable_index(browser, browser->selected);
                 if (next >= 0) {
                     char next_path[MAX_PATH_LEN + 1];
+                    uint16_t old_selected = browser->selected;
+                    uint16_t old_scroll = browser->scroll;
                     browser->selected = (uint16_t)next;
                     if (browser->selected < browser->scroll) {
                         browser->scroll = browser->selected;
@@ -485,7 +507,7 @@ int main(void) {
                         opl_set_muted(false);
                         playback_state = PLAYBACK_PLAYING;
                         strcpy(g_status_line, "Auto-advanced to next track");
-                        browser_dirty = true;
+                        refresh_browser_after_selection_change(browser, browser_focus, old_selected, old_scroll);
                         playback_dirty = true;
                         pos_dirty = true;
                     } else {
