@@ -36,5 +36,6 @@ void input_init(void);
 void input_poll(void);
 bool input_action_pressed(input_action_t action);
 bool input_action_held(input_action_t action);
+bool input_take_pressed_action(input_action_t *action_out);
 
 #endif

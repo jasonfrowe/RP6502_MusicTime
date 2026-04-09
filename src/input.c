@@ -8,6 +8,7 @@ static uint8_t keyboard[KEYBOARD_BYTES];
 static uint8_t prev_keyboard[KEYBOARD_BYTES];
 static gamepad_t pads[GAMEPAD_COUNT];
 static gamepad_t prev_pads[GAMEPAD_COUNT];
+static bool action_gate_locked = false;
 
 static bool key_down(uint8_t keycode) {
     return (keyboard[keycode >> 3] & (1u << (keycode & 7u))) != 0;
@@ -57,6 +58,66 @@ static bool pad_mask_pressed(uint8_t field, uint8_t mask) {
     return ((pads[idx].btn1 & mask) != 0) && ((prev_pads[idx].btn1 & mask) == 0);
 }
 
+static bool action_down_raw(input_action_t action) {
+    switch (action) {
+    case ACTION_UP:
+        return key_down(KEY_UP) || pad_mask_down(0, GP_DPAD_UP);
+    case ACTION_DOWN:
+        return key_down(KEY_DOWN) || pad_mask_down(0, GP_DPAD_DOWN);
+    case ACTION_SELECT:
+        return key_down(KEY_ENTER) || pad_mask_down(1, GP_BTN_A);
+    case ACTION_BACK:
+        return key_down(KEY_BACKSPACE) || pad_mask_down(1, GP_BTN_B);
+    case ACTION_PLAY_PAUSE:
+        return key_down(KEY_SPACE) || pad_mask_down(2, GP_BTN_START);
+    case ACTION_STOP:
+        return key_down(KEY_S) || pad_mask_down(2, GP_BTN_SELECT);
+    case ACTION_FF:
+        return key_down(KEY_F) || pad_mask_down(1, GP_BTN_R1);
+    case ACTION_RW:
+        return key_down(KEY_R) || pad_mask_down(1, GP_BTN_L1);
+    case ACTION_QUIT:
+        return key_down(KEY_Q) || key_down(KEY_ESC) || pad_mask_down(2, GP_BTN_HOME);
+    default:
+        return false;
+    }
+}
+
+static bool action_pressed_raw(input_action_t action) {
+    switch (action) {
+    case ACTION_UP:
+        return key_pressed(KEY_UP) || pad_mask_pressed(0, GP_DPAD_UP);
+    case ACTION_DOWN:
+        return key_pressed(KEY_DOWN) || pad_mask_pressed(0, GP_DPAD_DOWN);
+    case ACTION_SELECT:
+        return key_pressed(KEY_ENTER) || pad_mask_pressed(1, GP_BTN_A);
+    case ACTION_BACK:
+        return key_pressed(KEY_BACKSPACE) || pad_mask_pressed(1, GP_BTN_B);
+    case ACTION_PLAY_PAUSE:
+        return key_pressed(KEY_SPACE) || pad_mask_pressed(2, GP_BTN_START);
+    case ACTION_STOP:
+        return key_pressed(KEY_S) || pad_mask_pressed(2, GP_BTN_SELECT);
+    case ACTION_FF:
+        return key_pressed(KEY_F) || pad_mask_pressed(1, GP_BTN_R1);
+    case ACTION_RW:
+        return key_pressed(KEY_R) || pad_mask_pressed(1, GP_BTN_L1);
+    case ACTION_QUIT:
+        return key_pressed(KEY_Q) || key_pressed(KEY_ESC) || pad_mask_pressed(2, GP_BTN_HOME);
+    default:
+        return false;
+    }
+}
+
+static bool any_mapped_action_down(void) {
+    uint8_t a;
+    for (a = 0; a < ACTION_COUNT; ++a) {
+        if (action_down_raw((input_action_t)a)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void input_init(void) {
     xreg_ria_keyboard(KEYBOARD_XRAM_ADDR);
     xreg_ria_gamepad(GAMEPAD_XRAM_ADDR);
@@ -97,37 +158,49 @@ void input_poll(void) {
 }
 
 bool input_action_pressed(input_action_t action) {
-    switch (action) {
-    case ACTION_UP:
-        return key_pressed(KEY_UP) || pad_mask_pressed(0, GP_DPAD_UP);
-    case ACTION_DOWN:
-        return key_pressed(KEY_DOWN) || pad_mask_pressed(0, GP_DPAD_DOWN);
-    case ACTION_SELECT:
-        return key_pressed(KEY_ENTER) || pad_mask_pressed(1, GP_BTN_A);
-    case ACTION_BACK:
-        return key_pressed(KEY_BACKSPACE) || pad_mask_pressed(1, GP_BTN_B);
-    case ACTION_PLAY_PAUSE:
-        return key_pressed(KEY_SPACE) || pad_mask_pressed(2, GP_BTN_START);
-    case ACTION_STOP:
-        return key_pressed(KEY_S) || pad_mask_pressed(2, GP_BTN_SELECT);
-    case ACTION_FF:
-        return key_pressed(KEY_F) || pad_mask_pressed(1, GP_BTN_R1);
-    case ACTION_RW:
-        return key_pressed(KEY_R) || pad_mask_pressed(1, GP_BTN_L1);
-    case ACTION_QUIT:
-        return key_pressed(KEY_Q) || key_pressed(KEY_ESC) || pad_mask_pressed(2, GP_BTN_HOME);
-    default:
-        return false;
-    }
+    return action_pressed_raw(action);
 }
 
 bool input_action_held(input_action_t action) {
     switch (action) {
     case ACTION_UP:
-        return key_down(KEY_UP) || pad_mask_down(0, GP_DPAD_UP);
+        return action_down_raw(action);
     case ACTION_DOWN:
-        return key_down(KEY_DOWN) || pad_mask_down(0, GP_DPAD_DOWN);
+        return action_down_raw(action);
     default:
-        return input_action_pressed(action);
+        return action_down_raw(action);
     }
+}
+
+bool input_take_pressed_action(input_action_t *action_out) {
+    static const input_action_t order[ACTION_COUNT] = {
+        ACTION_QUIT,
+        ACTION_UP,
+        ACTION_DOWN,
+        ACTION_BACK,
+        ACTION_SELECT,
+        ACTION_PLAY_PAUSE,
+        ACTION_STOP,
+        ACTION_FF,
+        ACTION_RW,
+    };
+    uint8_t i;
+
+    if (action_gate_locked) {
+        if (!any_mapped_action_down()) {
+            action_gate_locked = false;
+        }
+        return false;
+    }
+
+    for (i = 0; i < ACTION_COUNT; ++i) {
+        input_action_t action = order[i];
+        if (action_pressed_raw(action)) {
+            action_gate_locked = true;
+            *action_out = action;
+            return true;
+        }
+    }
+
+    return false;
 }

@@ -102,6 +102,7 @@ int main(void) {
 
     while (!quit) {
         bool track_ended = false;
+        input_action_t action = ACTION_COUNT;
 
         SEI();
         ticks = g_vsync_count;
@@ -125,33 +126,31 @@ int main(void) {
 
         input_poll();
 
-        if (input_action_pressed(ACTION_QUIT)) {
-            quit = true;
-        }
-
-        if (input_action_pressed(ACTION_UP)) {
-            browser_move_up(browser);
-            browser_focus = true;
-            browser_dirty = true;
-        }
-
-        if (input_action_pressed(ACTION_DOWN)) {
-            browser_move_down(browser);
-            browser_focus = true;
-            browser_dirty = true;
-        }
-
-        if (input_action_pressed(ACTION_BACK)) {
-            if (!browser_go_parent(browser, g_status_line, sizeof(g_status_line))) {
-                strcpy(g_status_line, "Cannot go up");
-            }
-            browser_focus = true;
-            browser_dirty = true;
-            playback_dirty = true;
-            pos_dirty = true;
-        }
-
-        if (input_action_pressed(ACTION_SELECT)) {
+        if (input_take_pressed_action(&action)) {
+            switch (action) {
+            case ACTION_QUIT:
+                quit = true;
+                break;
+            case ACTION_UP:
+                browser_move_up(browser);
+                browser_focus = true;
+                browser_dirty = true;
+                break;
+            case ACTION_DOWN:
+                browser_move_down(browser);
+                browser_focus = true;
+                browser_dirty = true;
+                break;
+            case ACTION_BACK:
+                if (!browser_go_parent(browser, g_status_line, sizeof(g_status_line))) {
+                    strcpy(g_status_line, "Cannot go up");
+                }
+                browser_focus = true;
+                browser_dirty = true;
+                playback_dirty = true;
+                pos_dirty = true;
+                break;
+            case ACTION_SELECT: {
             char selected_path[MAX_PATH_LEN + 1];
             selected_path[0] = '\0';
             if (browser_activate_selected(browser,
@@ -192,67 +191,53 @@ int main(void) {
                     playback_dirty = true;
                 }
             }
-        }
-
-        if (input_action_pressed(ACTION_PLAY_PAUSE)) {
-            if (player->fd >= 0) {
-                if (playback_state == PLAYBACK_PLAYING) {
-                    playback_state = PLAYBACK_PAUSED;
-                    strcpy(g_status_line, "Paused");
+                break;
+            }
+            case ACTION_PLAY_PAUSE:
+                if (player->fd >= 0) {
+                    if (playback_state == PLAYBACK_PLAYING) {
+                        playback_state = PLAYBACK_PAUSED;
+                        strcpy(g_status_line, "Paused");
+                    } else {
+                        playback_state = PLAYBACK_PLAYING;
+                        strcpy(g_status_line, "Playing");
+                    }
                     playback_dirty = true;
                     pos_dirty = true;
-                    if (ticks == 0u) {
-                        uint8_t vsync_spin = RIA.vsync;
-                        while (RIA.vsync == vsync_spin) {
-                        }
-
-                        // Fallback path: we consumed one frame via direct VSYNC polling.
-                        // Clear any late IRQ tick for that same frame to avoid double-speed playback.
-                        SEI();
-                        g_vsync_count = 0;
-                        CLI();
-                        g_irq_vsync_last = RIA.vsync;
-                        (void)RIA.irq;
-                        ticks = 1u;
-                    }
+                    browser_focus = false;
+                    browser_dirty = true;
+                }
+                break;
+            case ACTION_STOP:
+                if (player->fd >= 0) {
+                    vgm_close(player);
+                }
+                opl_init();
+                playback_state = PLAYBACK_STOPPED;
+                strcpy(g_status_line, "Stopped");
+                browser_focus = true;
+                browser_dirty = true;
+                playback_dirty = true;
+                pos_dirty = true;
+                break;
+            case ACTION_FF:
+                if (player->fd >= 0) {
+                    vgm_seek_seconds(player, SEEK_SECONDS, g_status_line, sizeof(g_status_line));
                     playback_state = PLAYBACK_PLAYING;
-                    strcpy(g_status_line, "Playing");
                     playback_dirty = true;
                     pos_dirty = true;
                 }
-                browser_focus = false;
-                browser_dirty = true;
-            }
-        }
-
-        if (input_action_pressed(ACTION_STOP)) {
-            if (player->fd >= 0) {
-                vgm_close(player);
-            }
-            opl_init();
-            playback_state = PLAYBACK_STOPPED;
-            strcpy(g_status_line, "Stopped");
-            browser_focus = true;
-            browser_dirty = true;
-            playback_dirty = true;
-            pos_dirty = true;
-        }
-
-        if (input_action_pressed(ACTION_FF)) {
-            if (player->fd >= 0) {
-                vgm_seek_seconds(player, SEEK_SECONDS, g_status_line, sizeof(g_status_line));
-                playback_state = PLAYBACK_PLAYING;
-                playback_dirty = true;
-                pos_dirty = true;
-            }
-        }
-
-        if (input_action_pressed(ACTION_RW)) {
-            if (player->fd >= 0) {
-                vgm_seek_seconds(player, -SEEK_SECONDS, g_status_line, sizeof(g_status_line));
-                playback_state = PLAYBACK_PLAYING;
-                playback_dirty = true;
-                pos_dirty = true;
+                break;
+            case ACTION_RW:
+                if (player->fd >= 0) {
+                    vgm_seek_seconds(player, -SEEK_SECONDS, g_status_line, sizeof(g_status_line));
+                    playback_state = PLAYBACK_PLAYING;
+                    playback_dirty = true;
+                    pos_dirty = true;
+                }
+                break;
+            default:
+                break;
             }
         }
 
