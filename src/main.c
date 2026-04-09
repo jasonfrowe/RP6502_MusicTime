@@ -509,6 +509,7 @@ int main(void) {
                         g_active_file[sizeof(g_active_file) - 1] = '\0';
                         opl_set_muted(false);
                         playback_state = PLAYBACK_PLAYING;
+                        browser_focus = true;
                         strcpy(g_status_line, "Auto-advanced to next track");
                         refresh_browser_after_selection_change(browser, browser_focus, old_selected, old_scroll);
                         playback_dirty = true;
