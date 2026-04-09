@@ -558,6 +558,10 @@ int main(void) {
             ui_render_position(vgm_position_ms(player));
             pos_dirty = false;
         }
+
+        /* VU peak meters — decay and redraw every frame */
+        opl_decay_peaks();
+        ui_render_vu_meters(opl_peaks());
     }
 
     vgm_close(player);

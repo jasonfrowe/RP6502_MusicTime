@@ -26,5 +26,6 @@ void ui_render_playback(const char *active_file,
                         const char *meta_title,
                         const char *meta_author);
 void ui_render_position(uint32_t position_ms);
+void ui_render_vu_meters(const uint8_t *peaks);
 
 #endif

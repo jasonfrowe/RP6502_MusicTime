@@ -11,4 +11,8 @@ void opl_all_notes_off(void);
 void opl_set_muted(bool muted);
 bool opl_is_muted(void);
 
+/* VU peak meters — call opl_decay_peaks() once per frame, then read via opl_peaks() */
+void opl_decay_peaks(void);
+const uint8_t *opl_peaks(void);
+
 #endif

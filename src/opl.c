@@ -6,6 +6,19 @@
 
 static bool g_opl_muted = false;
 static uint8_t g_opl_shadow[256];
+static uint8_t g_ch_peaks[9];
+
+/*
+ * Carrier total-level register addresses for OPL2 channels 0-8.
+ * OPL2 operator slots are arranged in rows of 3; the carrier is the
+ * second operator in each channel pair (slot offset +3 within the row).
+ * TL register = 0x40 + slot_offset.
+ */
+static const uint8_t k_carrier_tl[9] = {
+    0x43, 0x44, 0x45,   /* channels 0-2 */
+    0x4B, 0x4C, 0x4D,   /* channels 3-5 */
+    0x53, 0x54, 0x55,   /* channels 6-8 */
+};
 
 static void opl_hw_write(uint8_t reg, uint8_t value) {
 #ifdef USE_NATIVE_OPL2
@@ -68,13 +81,42 @@ bool opl_is_muted(void) {
     return g_opl_muted;
 }
 
+void opl_decay_peaks(void) {
+    uint8_t ch;
+    for (ch = 0u; ch < 9u; ++ch) {
+        /* Decay existing peak first */
+        if (g_ch_peaks[ch] > 1u) {
+            g_ch_peaks[ch] = (uint8_t)(g_ch_peaks[ch] - 2u);
+        } else {
+            g_ch_peaks[ch] = 0u;
+        }
+        /* If this channel has key-on, update from current carrier TL */
+        if ((g_opl_shadow[0xB0u + ch] >> 5u) & 1u) {
+            uint8_t attn = g_opl_shadow[k_carrier_tl[ch]] & 0x3Fu;
+            uint8_t level = (attn > 62u) ? 0u : (uint8_t)(63u - attn);
+            if (level > g_ch_peaks[ch]) {
+                g_ch_peaks[ch] = level;
+            }
+        }
+    }
+}
+
+const uint8_t *opl_peaks(void) {
+    return g_ch_peaks;
+}
+
 void opl_init(void) {
     uint16_t reg;
+    uint8_t ch;
 
     opl_all_notes_off();
 
     for (reg = 1; reg <= 0xF5; ++reg) {
         opl_write((uint8_t)reg, 0x00);
+    }
+
+    for (ch = 0u; ch < 9u; ++ch) {
+        g_ch_peaks[ch] = 0u;
     }
 
     opl_write(0x01, 0x20);

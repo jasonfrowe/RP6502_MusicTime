@@ -11,6 +11,11 @@
 #define LIST_TOP 8
 #define LIST_ROWS 44
 
+#define VU_HDR_ROW  4
+#define VU_ROW_A    5
+#define VU_ROW_B    6
+#define VU_BAR_WID 10
+
 static unsigned text_addr;
 
 static void write_cell(uint8_t x, uint8_t y, char c, uint8_t fg, uint8_t bg) {
@@ -88,6 +93,10 @@ void ui_draw_frame(void) {
     for (row = 4; row < 8; ++row) {
         clear_row(row, UI_COL_BLACK);
     }
+
+    /* VU meter header */
+    clear_row(VU_HDR_ROW, UI_COL_DARKGREY);
+    draw_text(1, VU_HDR_ROW, "VU:", UI_COL_CYAN, UI_COL_DARKGREY);
 
     for (row = LIST_TOP; row < LIST_TOP + LIST_ROWS; ++row) {
         clear_row(row, UI_COL_BLACK);
@@ -233,4 +242,49 @@ void ui_render_position(uint32_t position_ms) {
              (unsigned long)(position_ms / 1000u),
              (unsigned long)((position_ms % 1000u) / 100u));
     draw_text(1, 55, line, UI_COL_WHITE, UI_COL_DARKGREY);
+}
+
+/*
+ * Draw a single OPL2 VU bar at (x, y).
+ * Format: "N [##########]" — 14 chars total.
+ * ch_num: display label 1-9.  level: 0-63.
+ * Color gradient: green (blocks 0-2), yellow (3-6), red (7-9).
+ */
+static void draw_vu_bar(uint8_t x, uint8_t y, uint8_t ch_num, uint8_t level) {
+    uint8_t i;
+    uint8_t blocks = level / 6u;
+
+    write_cell(x,               y, (char)('0' + ch_num), UI_COL_WHITE, UI_COL_BLACK);
+    write_cell((uint8_t)(x+1u), y, ' ',                  UI_COL_WHITE, UI_COL_BLACK);
+    write_cell((uint8_t)(x+2u), y, '[',                  UI_COL_CYAN,  UI_COL_BLACK);
+    for (i = 0u; i < VU_BAR_WID; ++i) {
+        uint8_t fg;
+        char glyph;
+        if (i < blocks) {
+            glyph = '#';
+            fg = (i < 3u) ? UI_COL_GREEN : ((i < 7u) ? UI_COL_YELLOW : UI_COL_RED);
+        } else {
+            glyph = '.';
+            fg = UI_COL_DARKGREY;
+        }
+        write_cell((uint8_t)(x + 3u + i), y, glyph, fg, UI_COL_BLACK);
+    }
+    write_cell((uint8_t)(x + 13u), y, ']', UI_COL_CYAN, UI_COL_BLACK);
+}
+
+/*
+ * Render all 9 OPL2 channel VU meters.
+ * peaks[9]: per-channel peak level 0-63 from opl_peaks().
+ * Row layout:
+ *   VU_ROW_A (row 5): channels 1-5, stride 16, start x=1
+ *   VU_ROW_B (row 6): channels 6-9, stride 16, start x=9
+ */
+void ui_render_vu_meters(const uint8_t *peaks) {
+    uint8_t i;
+    for (i = 0u; i < 5u; ++i) {
+        draw_vu_bar((uint8_t)(1u + i * 16u), VU_ROW_A, (uint8_t)(i + 1u), peaks[i]);
+    }
+    for (i = 0u; i < 4u; ++i) {
+        draw_vu_bar((uint8_t)(9u + i * 16u), VU_ROW_B, (uint8_t)(i + 6u), peaks[5u + i]);
+    }
 }
