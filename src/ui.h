@@ -19,7 +19,9 @@ void ui_render_browser(const browser_state_t *browser, bool browser_focus);
 void ui_render_playback(const char *active_file,
                         ui_playback_state_t playback_state,
                         uint32_t position_ms,
-                        const char *status_line);
+                        const char *status_line,
+                        const char *meta_title,
+                        const char *meta_author);
 void ui_render_position(uint32_t position_ms);
 
 #endif

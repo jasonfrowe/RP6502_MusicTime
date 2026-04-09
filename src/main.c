@@ -92,7 +92,7 @@ int main(void) {
 
     ui_draw_frame();
     ui_render_browser(browser, browser_focus);
-    ui_render_playback(g_active_file, UI_PLAYBACK_STOPPED, 0, g_status_line);
+    ui_render_playback(g_active_file, UI_PLAYBACK_STOPPED, 0, g_status_line, "", "");
     pos_dirty = false;
 
     g_irq_vsync_last = RIA.vsync;
@@ -310,7 +310,9 @@ int main(void) {
                                    ? UI_PLAYBACK_PLAYING
                                    : (playback_state == PLAYBACK_PAUSED ? UI_PLAYBACK_PAUSED : UI_PLAYBACK_STOPPED),
                                vgm_position_ms(player),
-                               g_status_line);
+                               g_status_line,
+                               player->gd3_title,
+                               player->gd3_author);
             playback_dirty = false;
             pos_dirty = false;
         } else if (pos_dirty) {

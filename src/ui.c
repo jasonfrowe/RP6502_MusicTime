@@ -148,7 +148,9 @@ void ui_render_browser(const browser_state_t *browser, bool browser_focus) {
 void ui_render_playback(const char *active_file,
                         ui_playback_state_t playback_state,
                         uint32_t position_ms,
-                        const char *status_line) {
+                        const char *status_line,
+                        const char *meta_title,
+                        const char *meta_author) {
     char line[81];
 
     clear_row(54, UI_COL_DARKGREY);
@@ -156,13 +158,26 @@ void ui_render_playback(const char *active_file,
     draw_text(1, 54, line, UI_COL_WHITE, UI_COL_DARKGREY);
 
     clear_row(55, UI_COL_DARKGREY);
-    snprintf(line, sizeof(line), "Pos: %lu.%03lus", (unsigned long)(position_ms / 1000u),
-             (unsigned long)(position_ms % 1000u));
+    snprintf(line, sizeof(line), "Pos: %lu.%lus",
+             (unsigned long)(position_ms / 1000u),
+             (unsigned long)((position_ms % 1000u) / 100u));
     draw_text(1, 55, line, UI_COL_WHITE, UI_COL_DARKGREY);
 
     clear_row(56, UI_COL_BLACK);
     snprintf(line, sizeof(line), "File: %s", active_file[0] != '\0' ? active_file : "(none)");
     draw_text(1, 56, line, UI_COL_GREEN, UI_COL_BLACK);
+
+    clear_row(57, UI_COL_BLACK);
+    if (meta_title != NULL && meta_title[0] != '\0') {
+        snprintf(line, sizeof(line), "Title: %s", meta_title);
+        draw_text(1, 57, line, UI_COL_YELLOW, UI_COL_BLACK);
+    }
+
+    clear_row(58, UI_COL_BLACK);
+    if (meta_author != NULL && meta_author[0] != '\0') {
+        snprintf(line, sizeof(line), "By:    %s", meta_author);
+        draw_text(1, 58, line, UI_COL_CYAN, UI_COL_BLACK);
+    }
 
     clear_row(59, UI_COL_BLUE);
     snprintf(line, sizeof(line), "Status: %s", status_line);
@@ -173,7 +188,8 @@ void ui_render_position(uint32_t position_ms) {
     char line[81];
 
     clear_row(55, UI_COL_DARKGREY);
-    snprintf(line, sizeof(line), "Pos: %lu.%03lus", (unsigned long)(position_ms / 1000u),
-             (unsigned long)(position_ms % 1000u));
+    snprintf(line, sizeof(line), "Pos: %lu.%lus",
+             (unsigned long)(position_ms / 1000u),
+             (unsigned long)((position_ms % 1000u) / 100u));
     draw_text(1, 55, line, UI_COL_WHITE, UI_COL_DARKGREY);
 }

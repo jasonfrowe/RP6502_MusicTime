@@ -63,6 +63,67 @@ static bool seek_data_start(vgm_player_t *player) {
     return true;
 }
 
+/* GD3 is a series of UTF-16 LE null-terminated strings.
+ * We read the whole tag block into player->buffer (temporarily), then
+ * extract field 0 (track title EN) and field 6 (author EN) as ASCII.
+ * Called before seek_data_start so seek_data_start clobbers no GD3 state. */
+static void vgm_try_read_gd3(vgm_player_t *player) {
+    uint8_t hdr[12];
+    uint32_t data_len;
+    int got;
+    uint32_t i;
+    uint8_t field;
+    char *dest;
+    uint16_t dest_max;
+    uint16_t dest_pos;
+    uint8_t lo, hi;
+
+    player->gd3_title[0]  = '\0';
+    player->gd3_author[0] = '\0';
+
+    if (player->gd3_offset == 0) return;
+    if (lseek(player->fd, (long)player->gd3_offset, SEEK_SET) < 0) return;
+    if (read(player->fd, hdr, 12) != 12) return;
+    if (memcmp(hdr, "Gd3 ", 4) != 0) return;
+
+    data_len = read_u32_le(&hdr[8]);
+    if (data_len == 0) return;
+    if (data_len > (uint32_t)sizeof(player->buffer))
+        data_len = (uint32_t)sizeof(player->buffer);
+
+    got = read(player->fd, player->buffer, (int)data_len);
+    if (got <= 0) return;
+
+    /* Fields: 0=title EN, 1=title JP, 2=game EN, 3=game JP,
+     *         4=sys EN, 5=sys JP, 6=author EN  — stop after 6 */
+    field    = 0;
+    dest     = player->gd3_title;
+    dest_max = (uint16_t)sizeof(player->gd3_title);
+    dest_pos = 0;
+
+    for (i = 0; i + 1u < (uint32_t)got; i += 2u) {
+        lo = player->buffer[i];
+        hi = player->buffer[i + 1u];
+
+        if (lo == 0u && hi == 0u) {
+            if (dest != NULL)
+                dest[dest_pos] = '\0';
+            dest_pos = 0;
+            field++;
+            if (field > 6u) break;
+            switch (field) {
+            case 6:  dest = player->gd3_author;
+                     dest_max = (uint16_t)sizeof(player->gd3_author); break;
+            default: dest = NULL; dest_max = 0u; break;
+            }
+        } else if (dest != NULL && dest_pos < dest_max - 1u) {
+            dest[dest_pos++] = (hi == 0u && lo >= 0x20u) ? (char)lo : '?';
+        }
+    }
+    if (dest != NULL)
+        dest[dest_pos] = '\0';
+}
+
 bool vgm_open(vgm_player_t *player, const char *path, char *status_line, uint16_t status_size) {
     uint8_t header[0x100];
     int got;
@@ -106,6 +167,12 @@ bool vgm_open(vgm_player_t *player, const char *path, char *status_line, uint16_
 
     player->total_samples = read_u32_le(&header[0x18]);
 
+    {
+        uint32_t gd3_rel = read_u32_le(&header[0x14]);
+        player->gd3_offset = (gd3_rel != 0u) ? (0x14u + gd3_rel) : 0u;
+    }
+    vgm_try_read_gd3(player);
+
     if (!seek_data_start(player)) {
         snprintf(status_line, status_size, "Seek failed (%d)", errno);
         vgm_close(player);
@@ -126,6 +193,8 @@ void vgm_close(vgm_player_t *player) {
     player->wait_samples = 0;
     player->sample_position = 0;
     player->reached_end = false;
+    player->gd3_title[0]  = '\0';
+    player->gd3_author[0] = '\0';
 }
 
 void vgm_reset_decoder(vgm_player_t *player) {

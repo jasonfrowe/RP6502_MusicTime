@@ -14,6 +14,11 @@ typedef struct {
     bool reached_end;
     bool has_loop;
 
+    /* GD3 metadata (ASCII-extracted from UTF-16 LE) */
+    uint32_t gd3_offset;
+    char gd3_title[48];
+    char gd3_author[32];
+
     uint8_t buffer[512];
     uint16_t buffer_pos;
     uint16_t buffer_size;
