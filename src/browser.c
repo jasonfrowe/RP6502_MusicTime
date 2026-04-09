@@ -162,16 +162,21 @@ void browser_page_up(browser_state_t *state) {
     if (state->entry_count == 0) {
         return;
     }
-    
+
+    if (state->scroll == 0) {
+        state->selected = 0;
+        return;
+    }
+
     uint16_t cursor_offset = (state->selected >= state->scroll) ? 
                              (state->selected - state->scroll) : 0;
-    
+
     if (state->scroll >= VIEW_ROWS) {
         state->scroll -= VIEW_ROWS;
     } else if (state->scroll > 0) {
         state->scroll = 0;
     }
-    
+
     state->selected = state->scroll + cursor_offset;
     if (state->selected >= state->entry_count) {
         state->selected = state->entry_count - 1;
@@ -182,17 +187,26 @@ void browser_page_down(browser_state_t *state) {
     if (state->entry_count == 0) {
         return;
     }
-    
+
+    if (state->selected == state->entry_count - 1) {
+        return;
+    }
+
     uint16_t cursor_offset = (state->selected >= state->scroll) ? 
                              (state->selected - state->scroll) : 0;
-    
+    uint16_t old_scroll = state->scroll;
     uint16_t next_scroll = state->scroll + VIEW_ROWS;
     if (next_scroll < state->entry_count) {
         state->scroll = next_scroll;
     } else if (state->scroll + VIEW_ROWS <= state->entry_count) {
         state->scroll = (state->entry_count > VIEW_ROWS) ? (state->entry_count - VIEW_ROWS) : 0;
     }
-    
+
+    if (state->scroll == old_scroll) {
+        state->selected = state->entry_count - 1;
+        return;
+    }
+
     state->selected = state->scroll + cursor_offset;
     if (state->selected >= state->entry_count) {
         state->selected = state->entry_count - 1;
