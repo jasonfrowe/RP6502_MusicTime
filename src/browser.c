@@ -120,11 +120,17 @@ void browser_move_up(browser_state_t *state) {
     if (state->entry_count == 0) {
         return;
     }
-    if (state->selected > 0) {
+    
+    if (state->selected > state->scroll) {
         --state->selected;
-    }
-    if (state->selected < state->scroll) {
-        state->scroll = state->selected;
+    } else if (state->selected == state->scroll && state->selected > 0) {
+        state->scroll = (state->scroll >= VIEW_ROWS) ? (state->scroll - VIEW_ROWS) : 0;
+        state->selected = state->scroll + (VIEW_ROWS - 1);
+        if (state->selected >= state->entry_count) {
+            state->selected = state->entry_count - 1;
+        }
+    } else if (state->selected > 0) {
+        --state->selected;
     }
 }
 
@@ -132,11 +138,23 @@ void browser_move_down(browser_state_t *state) {
     if (state->entry_count == 0) {
         return;
     }
-    if (state->selected + 1 < state->entry_count) {
-        ++state->selected;
+    
+    uint16_t page_bottom = state->scroll + (VIEW_ROWS - 1);
+    if (page_bottom >= state->entry_count) {
+        page_bottom = state->entry_count - 1;
     }
-    if (state->selected >= state->scroll + VIEW_ROWS) {
-        state->scroll = state->selected - (VIEW_ROWS - 1);
+    
+    if (state->selected < page_bottom) {
+        ++state->selected;
+    } else if (state->selected == page_bottom && state->selected + 1 < state->entry_count) {
+        state->scroll = (page_bottom + 1 < state->entry_count) ? (page_bottom + 1) : 
+                        ((state->entry_count > VIEW_ROWS) ? (state->entry_count - VIEW_ROWS) : 0);
+        state->selected = state->scroll;
+        if (state->selected >= state->entry_count) {
+            state->selected = state->entry_count - 1;
+        }
+    } else if (state->selected + 1 < state->entry_count) {
+        ++state->selected;
     }
 }
 

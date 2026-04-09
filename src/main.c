@@ -135,17 +135,27 @@ int main(void) {
                 break;
             case ACTION_UP: {
                 uint16_t old_selected = browser->selected;
+                uint16_t old_scroll = browser->scroll;
                 browser_move_up(browser);
                 browser_focus = true;
-                ui_render_browser_selection(browser, browser_focus, old_selected);
+                if (browser->scroll != old_scroll) {
+                    ui_render_browser(browser, browser_focus);
+                } else {
+                    ui_render_browser_selection(browser, browser_focus, old_selected);
+                }
                 up_repeat_counter = 0;
                 break;
             }
             case ACTION_DOWN: {
                 uint16_t old_selected = browser->selected;
+                uint16_t old_scroll = browser->scroll;
                 browser_move_down(browser);
                 browser_focus = true;
-                ui_render_browser_selection(browser, browser_focus, old_selected);
+                if (browser->scroll != old_scroll) {
+                    ui_render_browser(browser, browser_focus);
+                } else {
+                    ui_render_browser_selection(browser, browser_focus, old_selected);
+                }
                 down_repeat_counter = 0;
                 break;
             }
@@ -266,26 +276,32 @@ int main(void) {
         // Auto-repeat for navigation when keys are held
         if (browser_focus) {
             if (input_action_held(ACTION_UP)) {
-                if (up_repeat_counter < 255) {
-                    up_repeat_counter++;
-                }
+                up_repeat_counter++;
                 if (up_repeat_counter > 30 && up_repeat_counter % 6 == 0) {
                     uint16_t old_selected = browser->selected;
+                    uint16_t old_scroll = browser->scroll;
                     browser_move_up(browser);
-                    ui_render_browser_selection(browser, browser_focus, old_selected);
+                    if (browser->scroll != old_scroll) {
+                        ui_render_browser(browser, browser_focus);
+                    } else {
+                        ui_render_browser_selection(browser, browser_focus, old_selected);
+                    }
                 }
             } else {
                 up_repeat_counter = 0;
             }
 
             if (input_action_held(ACTION_DOWN)) {
-                if (down_repeat_counter < 255) {
-                    down_repeat_counter++;
-                }
+                down_repeat_counter++;
                 if (down_repeat_counter > 30 && down_repeat_counter % 6 == 0) {
                     uint16_t old_selected = browser->selected;
+                    uint16_t old_scroll = browser->scroll;
                     browser_move_down(browser);
-                    ui_render_browser_selection(browser, browser_focus, old_selected);
+                    if (browser->scroll != old_scroll) {
+                        ui_render_browser(browser, browser_focus);
+                    } else {
+                        ui_render_browser_selection(browser, browser_focus, old_selected);
+                    }
                 }
             } else {
                 down_repeat_counter = 0;
