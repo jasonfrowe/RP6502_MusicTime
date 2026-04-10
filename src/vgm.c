@@ -155,13 +155,27 @@ bool vgm_open(vgm_player_t *player, const char *path, char *status_line, uint16_
 
     /* VGM 1.51+ has chip clock fields. Offset 0x50 = YM3812 (OPL2) clock.
      * If non-zero the file targets OPL2; if zero it was made for a different
-     * chip (e.g., OPL3/YMF262, YM2612, etc.) and we cannot play it. */
+     * chip and we cannot play it. */
     {
         uint32_t version = read_u32_le(&header[0x08]);
         if (version >= 0x151u && (uint16_t)got >= 0x54u) {
             uint32_t ym3812_clk = read_u32_le(&header[0x50]);
             if (ym3812_clk == 0u) {
-                snprintf(status_line, status_size, "Incompatible chip (not OPL2/YM3812)");
+                const char *chip = "non-OPL2";
+                if ((uint16_t)got >= 0x60u && read_u32_le(&header[0x5C]) != 0u) {
+                    chip = "OPL3/YMF262";
+                } else if ((uint16_t)got >= 0x58u && read_u32_le(&header[0x54]) != 0u) {
+                    chip = "OPL/YM3526";
+                } else if ((uint16_t)got >= 0x5Cu && read_u32_le(&header[0x58]) != 0u) {
+                    chip = "Y8950";
+                } else if ((uint16_t)got >= 0x34u && read_u32_le(&header[0x30]) != 0u) {
+                    chip = "YM2151";
+                } else if ((uint16_t)got >= 0x30u && read_u32_le(&header[0x2C]) != 0u) {
+                    chip = "YM2612";
+                } else if ((uint16_t)got >= 0x14u && read_u32_le(&header[0x10]) != 0u) {
+                    chip = "YM2413";
+                }
+                snprintf(status_line, status_size, "Incompatible: %s", chip);
                 vgm_close(player);
                 return false;
             }
