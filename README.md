@@ -70,7 +70,7 @@ MusicTime currently supports a practical OPL2-focused subset of VGM commands.
 
 - Input files should be `.vgm` (not compressed `.vgz`)
 - Unsupported commands are ignored with a warning status line when encountered
-- Browser/file loading uses fixed-size internal buffers: filenames longer than 95 characters or full paths longer than 256 characters may be truncated and then fail to open correctly
+- Browser/file loading uses fixed-size internal buffers: filenames longer than 63 characters or full paths longer than 256 characters may be truncated and then fail to open correctly
 - For better compatibility, keep `.vgm` basenames short; the included `tools/vgz_clean.sh` script caps cleaned names to 60 characters before the `.vgm` extension
 
 ## Build
