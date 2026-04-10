@@ -381,5 +381,7 @@ void vgm_seek_seconds(vgm_player_t *player, int delta_seconds, char *status_line
 }
 
 uint32_t vgm_position_ms(const vgm_player_t *player) {
-    return (player->sample_position * 1000u) / 44100u;
+    uint32_t secs = player->sample_position / 44100u;
+    uint32_t rem = player->sample_position % 44100u;
+    return (secs * 1000u) + ((rem * 1000u) / 44100u);
 }
