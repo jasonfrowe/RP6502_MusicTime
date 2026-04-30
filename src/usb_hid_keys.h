@@ -9,10 +9,14 @@
 #define KEY_RSHIFT 0xE5
 
 #define KEY_Q 0x14
+#define KEY_H 0x0B
 #define KEY_L 0x0F
 #define KEY_S 0x16
 #define KEY_F 0x09
 #define KEY_R 0x15
+
+#define KEY_PAGEUP 0x4B
+#define KEY_PAGEDOWN 0x4E
 
 #define KEY_RIGHT 0x4F
 #define KEY_LEFT 0x50

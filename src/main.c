@@ -45,6 +45,48 @@ static browser_state_t g_browser;
 static vgm_player_t g_player;
 static char g_active_file[MAX_PATH_LEN + 1];
 static char g_status_line[80];
+static uint32_t g_rng_state = 0xC0FFEE11u;
+
+static uint32_t rng_next(void) {
+    g_rng_state = (g_rng_state * 1664525u) + 1013904223u;
+    return g_rng_state;
+}
+
+static void rng_mix(uint32_t value) {
+    if (value == 0u) {
+        value = 0x9E3779B9u;
+    }
+    g_rng_state ^= value + 0x9E3779B9u + (g_rng_state << 6) + (g_rng_state >> 2);
+}
+
+static int random_playable_index(const browser_state_t *browser, int exclude_index) {
+    uint16_t i;
+    uint16_t playable = 0;
+
+    for (i = 0; i < browser->entry_count; ++i) {
+        if (!browser->entries[i].is_dir && strcmp(browser->entries[i].name, "..") != 0 &&
+            (int)i != exclude_index) {
+            ++playable;
+        }
+    }
+
+    if (playable == 0u) {
+        return -1;
+    }
+
+    uint16_t pick = (uint16_t)(rng_next() % playable);
+    for (i = 0; i < browser->entry_count; ++i) {
+        if (!browser->entries[i].is_dir && strcmp(browser->entries[i].name, "..") != 0 &&
+            (int)i != exclude_index) {
+            if (pick == 0u) {
+                return (int)i;
+            }
+            --pick;
+        }
+    }
+
+    return -1;
+}
 
 static void full_path_from_entry(const browser_state_t *browser,
                                  uint16_t index,
@@ -121,6 +163,7 @@ int main(void) {
     uint16_t page_up_repeat_counter = 0;
     uint16_t page_down_repeat_counter = 0;
     bool loop_enabled = false;
+    bool shuffle_enabled = false;
     uint32_t frame_counter = 0;
     uint32_t last_left_press_frame = 0xFFFFFFFFu;
 
@@ -142,7 +185,7 @@ int main(void) {
 
     ui_draw_frame();
     ui_render_browser(browser, browser_focus);
-    ui_render_playback(g_active_file, UI_PLAYBACK_STOPPED, 0, loop_enabled, false, g_status_line, "", "");
+    ui_render_playback(g_active_file, UI_PLAYBACK_STOPPED, 0, loop_enabled, false, false, g_status_line, "", "");
     pos_dirty = false;
 
     g_irq_vsync_last = RIA.vsync;
@@ -255,7 +298,9 @@ int main(void) {
                 last_left_press_frame = frame_counter;
                 break;
             case ACTION_NEXT_TRACK: {
-                int next = browser_next_playable_index(browser, browser->selected);
+                int next = shuffle_enabled
+                    ? random_playable_index(browser, (int)browser->selected)
+                    : browser_next_playable_index(browser, browser->selected);
                 if (next >= 0) {
                     uint16_t old_selected = browser->selected;
                     uint16_t old_scroll = browser->scroll;
@@ -274,13 +319,13 @@ int main(void) {
                                                   sizeof(g_active_file),
                                                   g_status_line,
                                                   sizeof(g_status_line))) {
-                        strcpy(g_status_line, "Next track");
+                        strcpy(g_status_line, shuffle_enabled ? "Random track" : "Next track");
                     }
                     refresh_browser_after_selection_change(browser, browser_focus, old_selected, old_scroll);
                     playback_dirty = true;
                     pos_dirty = true;
                 } else {
-                    strcpy(g_status_line, "End of list");
+                    strcpy(g_status_line, shuffle_enabled ? "No other tracks" : "End of list");
                     playback_dirty = true;
                 }
                 break;
@@ -294,6 +339,14 @@ int main(void) {
                          sizeof(g_status_line),
                          "Loop %s",
                          loop_enabled ? "enabled" : "disabled");
+                playback_dirty = true;
+                break;
+            case ACTION_SHUFFLE_TOGGLE:
+                shuffle_enabled = !shuffle_enabled;
+                snprintf(g_status_line,
+                         sizeof(g_status_line),
+                         "Shuffle %s",
+                         shuffle_enabled ? "enabled" : "disabled");
                 playback_dirty = true;
                 break;
             case ACTION_BACK:
@@ -330,6 +383,7 @@ int main(void) {
                     opl_init();
                     if (vgm_open(player, selected_path, g_status_line, sizeof(g_status_line))) {
                         uint16_t old_selected = browser->selected;
+                        rng_mix(frame_counter ^ (uint32_t)browser->selected);
                         player->loop_enabled = loop_enabled;
                         strncpy(g_active_file, selected_path, sizeof(g_active_file) - 1);
                         g_active_file[sizeof(g_active_file) - 1] = '\0';
@@ -488,7 +542,9 @@ int main(void) {
         if (playback_state == PLAYBACK_PLAYING) {
             vgm_update(player, 735u * (uint32_t)ticks, &track_ended, g_status_line, sizeof(g_status_line));
             if (track_ended) {
-                int next = browser_next_playable_index(browser, browser->selected);
+                int next = shuffle_enabled
+                    ? random_playable_index(browser, (int)browser->selected)
+                    : browser_next_playable_index(browser, browser->selected);
                 if (next >= 0) {
                     char next_path[MAX_PATH_LEN + 1];
                     uint16_t old_selected = browser->selected;
@@ -504,13 +560,14 @@ int main(void) {
                     vgm_close(player);
                     opl_init();
                     if (vgm_open(player, next_path, g_status_line, sizeof(g_status_line))) {
+                        rng_mix(frame_counter ^ (uint32_t)browser->selected);
                         player->loop_enabled = loop_enabled;
                         strncpy(g_active_file, next_path, sizeof(g_active_file) - 1);
                         g_active_file[sizeof(g_active_file) - 1] = '\0';
                         opl_set_muted(false);
                         playback_state = PLAYBACK_PLAYING;
                         browser_focus = true;
-                        strcpy(g_status_line, "Auto-advanced to next track");
+                        strcpy(g_status_line, shuffle_enabled ? "Auto-advanced (shuffle)" : "Auto-advanced to next track");
                         refresh_browser_after_selection_change(browser, browser_focus, old_selected, old_scroll);
                         playback_dirty = true;
                         pos_dirty = true;
@@ -521,7 +578,7 @@ int main(void) {
                     }
                 } else {
                     playback_state = PLAYBACK_STOPPED;
-                    strcpy(g_status_line, "End of list");
+                    strcpy(g_status_line, shuffle_enabled ? "No other tracks" : "End of list");
                     playback_dirty = true;
                     pos_dirty = true;
                 }
@@ -548,6 +605,7 @@ int main(void) {
                                    : (playback_state == PLAYBACK_PAUSED ? UI_PLAYBACK_PAUSED : UI_PLAYBACK_STOPPED),
                                vgm_position_ms(player),
                                loop_enabled,
+                               shuffle_enabled,
                                (player->fd >= 0) ? player->has_loop : false,
                                g_status_line,
                                player->gd3_title,

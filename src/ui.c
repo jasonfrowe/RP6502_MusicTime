@@ -82,10 +82,10 @@ void ui_draw_frame(void) {
     draw_text(1, 0, "MusicTime - OPL2 VGM Player", UI_COL_WHITE, UI_COL_BLUE);
 
     clear_row(1, UI_COL_DARKGREY);
-    draw_text(1, 1, "Nav: Up/Down Select: Enter/A Back: Backspace/B", UI_COL_WHITE, UI_COL_DARKGREY);
+    draw_text(1, 1, "Nav: Up/Down Pg: PgUp/PgDn or Shift+Up/Down Select: Enter/A Back: Backspace/B", UI_COL_WHITE, UI_COL_DARKGREY);
 
     clear_row(2, UI_COL_DARKGREY);
-    draw_text(1, 2, "Transport: Space Pause  S Stop  L Loop  Left/Right Prev/Next  F/R Seek  Q Quit", UI_COL_WHITE, UI_COL_DARKGREY);
+    draw_text(1, 2, "Trans: Space Pause |S Stop |H Shuffle |Left/Right Prev/Next| F/R Seek |Q Quit", UI_COL_WHITE, UI_COL_DARKGREY);
 
     clear_row(3, UI_COL_BLACK);
     draw_text(1, 3, "Path:", UI_COL_CYAN, UI_COL_BLACK);
@@ -192,6 +192,7 @@ void ui_render_playback(const char *active_file,
                         ui_playback_state_t playback_state,
                         uint32_t position_ms,
                         bool loop_enabled,
+                        bool shuffle_enabled,
                         bool has_loop,
                         const char *status_line,
                         const char *meta_title,
@@ -201,10 +202,11 @@ void ui_render_playback(const char *active_file,
     clear_row(54, UI_COL_DARKGREY);
     snprintf(line,
              sizeof(line),
-             "State: %s  VGMTagLoop: %s%s",
+             "State: %s  VGMTagLoop: %s%s  Shuffle: %s",
              playback_label(playback_state),
              loop_enabled ? "On" : "Off",
-             has_loop ? "" : " (no tag)");
+             has_loop ? "" : " (no tag)",
+             shuffle_enabled ? "On" : "Off");
     draw_text(1, 54, line, UI_COL_WHITE, UI_COL_DARKGREY);
 
     clear_row(55, UI_COL_DARKGREY);
