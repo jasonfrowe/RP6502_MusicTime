@@ -1,6 +1,7 @@
 #include <rp6502.h>
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -147,7 +148,9 @@ static void refresh_browser_after_selection_change(const browser_state_t *browse
     }
 }
 
-int main(void) {
+void * argv_mem(size_t size) { return malloc(size); }
+
+int main(int argc, char **argv) {
     browser_state_t *browser = &g_browser;
     vgm_player_t *player = &g_player;
     playback_state_t playback_state = PLAYBACK_STOPPED;
@@ -164,8 +167,25 @@ int main(void) {
     uint16_t page_down_repeat_counter = 0;
     bool loop_enabled = false;
     bool shuffle_enabled = false;
+    bool auto_play = false;
     uint32_t frame_counter = 0;
     uint32_t last_left_press_frame = 0xFFFFFFFFu;
+
+    for (int ai = 1; ai < argc; ++ai) {
+        const char *arg = argv[ai];
+        if (arg == NULL || arg[0] != '-') {
+            continue;
+        }
+        for (const char *p = arg + 1; *p != '\0'; ++p) {
+            if (*p == 'p') {
+                auto_play = true;
+            } else if (*p == 's') {
+                shuffle_enabled = true;
+            }
+        }
+    }
+
+    rng_mix((uint32_t)ria_attr_get(RIA_ATTR_LRAND));
 
     g_active_file[0] = '\0';
     g_status_line[0] = '\0';
@@ -178,14 +198,50 @@ int main(void) {
     input_init();
     ui_init();
 
-    browser_init(browser, "/");
+    char start_path[MAX_PATH_LEN + 1];
+    if (f_getcwd(start_path, sizeof(start_path)) <= 0) {
+        strcpy(start_path, "/");
+    }
+    browser_init(browser, start_path);
     if (!browser_refresh(browser, g_status_line, sizeof(g_status_line))) {
-        strcpy(g_status_line, "Failed to read root directory");
+        snprintf(g_status_line, sizeof(g_status_line), "Failed to read %s", start_path);
+    }
+
+    if (auto_play && browser->entry_count > 0) {
+        int idx = shuffle_enabled
+            ? random_playable_index(browser, -1)
+            : browser_next_playable_index(browser, (uint16_t)-1);
+        if (idx >= 0) {
+            browser->selected = (uint16_t)idx;
+            if (browser->selected >= 44u) {
+                browser->scroll = browser->selected - 43u;
+            }
+            if (start_track_from_selected(browser,
+                                          player,
+                                          &playback_state,
+                                          loop_enabled,
+                                          g_active_file,
+                                          sizeof(g_active_file),
+                                          g_status_line,
+                                          sizeof(g_status_line))) {
+                browser_focus = false;
+            }
+        }
     }
 
     ui_draw_frame();
     ui_render_browser(browser, browser_focus);
-    ui_render_playback(g_active_file, UI_PLAYBACK_STOPPED, 0, loop_enabled, false, false, g_status_line, "", "");
+    ui_render_playback(g_active_file,
+                       playback_state == PLAYBACK_PLAYING
+                           ? UI_PLAYBACK_PLAYING
+                           : (playback_state == PLAYBACK_PAUSED ? UI_PLAYBACK_PAUSED : UI_PLAYBACK_STOPPED),
+                       vgm_position_ms(player),
+                       loop_enabled,
+                       shuffle_enabled,
+                       (player->fd >= 0) ? player->has_loop : false,
+                       g_status_line,
+                       player->gd3_title,
+                       player->gd3_author);
     pos_dirty = false;
 
     g_irq_vsync_last = RIA.vsync;
@@ -253,8 +309,17 @@ int main(void) {
                 break;
             }
             case ACTION_PAGE_UP:
+                browser_page_up(browser);
+                browser_focus = true;
+                ui_render_browser(browser, browser_focus);
+                page_up_repeat_counter = 0;
+                break;
             case ACTION_PAGE_DOWN:
-                break;  // Handle these below with direct key checking
+                browser_page_down(browser);
+                browser_focus = true;
+                ui_render_browser(browser, browser_focus);
+                page_down_repeat_counter = 0;
+                break;
             case ACTION_PREV_TRACK:
                 if (player->fd >= 0 && (frame_counter - last_left_press_frame) <= 20u) {
                     int prev = browser_prev_playable_index(browser, browser->selected);
@@ -467,20 +532,6 @@ int main(void) {
                 break;
             default:
                 break;
-            }
-        }
-
-        // Handle page up/down directly (not gated) for immediate response to Shift+Up/Down
-        if (browser_focus) {
-            if (input_action_pressed(ACTION_PAGE_UP)) {
-                browser_page_up(browser);
-                ui_render_browser(browser, browser_focus);
-                page_up_repeat_counter = 0;
-            }
-            if (input_action_pressed(ACTION_PAGE_DOWN)) {
-                browser_page_down(browser);
-                ui_render_browser(browser, browser_focus);
-                page_down_repeat_counter = 0;
             }
         }
 

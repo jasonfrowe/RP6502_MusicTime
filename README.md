@@ -31,6 +31,16 @@ OPL2 (YM3812) playback with a fast in-device file browser.
 - `R`: Seek backward
 - `Q` or `Esc`: Quit
 
+### Command-line arguments
+
+MusicTime starts the file browser in the current working directory. Optional flags:
+
+- `-p`: start playing the first track in the directory immediately
+- `-s`: enable shuffle at startup
+- `-ps` (or `-sp`): both — start playing a random track immediately
+
+Example: from a directory of `.vgm` files on the RP6502, run `MusicTime -ps` to launch straight into shuffle playback.
+
 ### Gamepad (active pad)
 
 - D-Pad Up/Down: Move selection
@@ -70,7 +80,7 @@ MusicTime currently supports a practical OPL2-focused subset of VGM commands.
 
 - Input files should be `.vgm` (not compressed `.vgz`)
 - Unsupported commands are ignored with a warning status line when encountered
-- Browser/file loading uses fixed-size internal buffers: filenames longer than 63 characters or full paths longer than 256 characters may be truncated and then fail to open correctly
+- Browser/file loading uses fixed-size internal buffers: filenames longer than 64 characters or full paths longer than 256 characters may be truncated and then fail to open correctly
 - For better compatibility, keep `.vgm` basenames short; the included `tools/vgz_clean.sh` script caps cleaned names to 60 characters before the `.vgm` extension
 
 ## Build
