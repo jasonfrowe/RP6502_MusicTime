@@ -18,7 +18,7 @@ OPL2 (YM3812) playback with a fast in-device file browser.
 ### Keyboard
 
 - `Up` / `Down`: Move selection
-- `Shift+Up` / `Shift+Down`: Page up/down
+- `PageUp` / `PageDown` (or `Shift+Up` / `Shift+Down`): Page up/down
 - `Enter`: Select/open
 - `Backspace`: Go to parent directory
 - `Left`: Restart current track
@@ -27,6 +27,7 @@ OPL2 (YM3812) playback with a fast in-device file browser.
 - `Space`: Play/Pause
 - `S`: Stop
 - `L`: Toggle `VGMTagLoop` on/off
+- `H`: Toggle shuffle on/off
 - `F`: Seek forward
 - `R`: Seek backward
 - `Q` or `Esc`: Quit
